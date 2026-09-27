@@ -6,6 +6,7 @@ import { ItinerarySection } from './components/ItinerarySection';
 import { RegistrationSection } from './components/RegistrationSection';
 import { AdminModal } from './components/AdminModal';
 import { Footer } from './components/Footer';
+import { WhatsAppButton } from './components/WhatsAppButton';
 import { 
   getTripInfo, 
   saveTripInfo, 
@@ -101,6 +102,9 @@ export function App() {
         onUpdateTrip={handleUpdateTrip}
         onDeleteRegistration={handleDeleteRegistration}
       />
+
+      {/* Botón Flotante de Contacto por WhatsApp */}
+      <WhatsAppButton />
     </div>
   );
 }

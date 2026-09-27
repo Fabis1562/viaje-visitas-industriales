@@ -56,10 +56,22 @@ export const Footer = ({ onOpenAdmin, trip }) => {
                 <Mail size={15} style={{ color: 'var(--accent-cyan)' }} />
                 <span>comite.viaje@instituto.edu.mx</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <a 
+                href="https://wa.me/524931703238?text=Hola%2C%20tengo%20dudas%20sobre%20el%20Viaje%20de%20Pr%C3%A1cticas%202026"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem', 
+                  color: '#4ade80', 
+                  textDecoration: 'none',
+                  fontWeight: 600
+                }}
+              >
                 <Phone size={15} style={{ color: 'var(--accent-emerald)' }} />
-                <span>Atención WhatsApp Alumnos</span>
-              </div>
+                <span>Enviar WhatsApp al Comité</span>
+              </a>
               <button 
                 onClick={onOpenAdmin}
                 className="btn btn-secondary"
