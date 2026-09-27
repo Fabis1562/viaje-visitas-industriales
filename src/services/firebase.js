@@ -16,13 +16,13 @@ export const getFirebaseConfig = () => {
   }
 
   return {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-    appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
-    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || '',
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyBYUXvFjh8fno50qiYSIar-LDcPNKr1t-g',
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'viaje-escolar.firebaseapp.com',
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'viaje-escolar',
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'viaje-escolar.firebasestorage.app',
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '904372387916',
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:904372387916:web:6f79c1942b226f829b74e9',
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-L2BQ679538',
   };
 };
 
