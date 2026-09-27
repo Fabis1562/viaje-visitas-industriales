@@ -40,13 +40,13 @@ export const Navbar = ({ onOpenAdmin, tripTitle }) => {
         </ul>
 
         <div className="nav-actions">
-          <a href="#registro" className="btn btn-primary" style={{ padding: '0.55rem 1.2rem', fontSize: '0.88rem' }}>
+          <a href="#registro" className="btn btn-primary nav-btn-register" style={{ padding: '0.55rem 1.2rem', fontSize: '0.88rem' }}>
             <Users size={16} />
             <span>Apartar Lugar</span>
           </a>
           <button 
             onClick={onOpenAdmin}
-            className="btn btn-secondary" 
+            className="btn btn-secondary nav-btn-admin" 
             title="Panel de Administración para Organizadores"
             style={{ 
               padding: '0.55rem 1rem', 
@@ -59,7 +59,7 @@ export const Navbar = ({ onOpenAdmin, tripTitle }) => {
             }}
           >
             <ShieldCheck size={16} style={{ color: 'var(--accent-cyan)' }} />
-            <span style={{ fontWeight: 600 }}>Admin</span>
+            <span className="nav-admin-text" style={{ fontWeight: 600 }}>Admin</span>
           </button>
         </div>
       </div>

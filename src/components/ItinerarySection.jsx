@@ -61,7 +61,7 @@ export const ItinerarySection = ({ itinerary = [] }) => {
         </div>
 
         {/* Tarjeta del Día Activo */}
-        <div className="glass-panel" style={{ padding: '2.5rem', maxWidth: '900px', margin: '0 auto' }}>
+        <div className="glass-panel itinerary-day-card" style={{ maxWidth: '900px', margin: '0 auto' }}>
           
           <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '1.25rem', marginBottom: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>

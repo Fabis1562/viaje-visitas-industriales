@@ -371,7 +371,7 @@ export const RegistrationSection = ({ onRegistrationSuccess, tripTitle }) => {
                 </div>
 
                 {/* 2. No. de Control y Edad en dos columnas */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '1rem' }}>
+                <div className="form-row-grid">
                   <div className="form-group">
                     <label className="form-label" htmlFor="controlNumber">
                       <Hash size={15} style={{ color: 'var(--accent-cyan)' }} />
@@ -412,7 +412,7 @@ export const RegistrationSection = ({ onRegistrationSuccess, tripTitle }) => {
                 <div className="form-group">
                   <label className="form-label">
                     <GraduationCap size={15} style={{ color: 'var(--accent-emerald)' }} />
-                    <span>Semestre (Selecciona tu semestre del 1° al 9°) *</span>
+                    <span>Semestre (Selecciona del 1° al 9°) *</span>
                   </label>
                   <div className="semester-selector-grid">
                     {SEMESTERS.map(sem => (
@@ -422,14 +422,14 @@ export const RegistrationSection = ({ onRegistrationSuccess, tripTitle }) => {
                         className={`semester-pill ${formData.semester === sem ? 'selected' : ''}`}
                         onClick={() => handleSemesterSelect(sem)}
                       >
-                        {sem}° Semestre
+                        {sem}° <span className="semester-word">Semestre</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
                 {/* 4. Grupo */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '1rem' }}>
+                <div className="form-row-grid">
                   <div className="form-group">
                     <label className="form-label" htmlFor="group">
                       <Layers size={15} style={{ color: 'var(--accent-purple)' }} />

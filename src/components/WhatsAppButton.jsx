@@ -8,6 +8,7 @@ export const WhatsAppButton = () => {
 
   return (
     <aside 
+      className="whatsapp-aside"
       aria-label="Atención por WhatsApp"
       style={{
         position: 'fixed',
@@ -22,6 +23,7 @@ export const WhatsAppButton = () => {
     >
       {/* Tooltip flotante en hover o descanso */}
       <div 
+        className="whatsapp-tooltip"
         style={{
           background: 'rgba(15, 23, 42, 0.95)',
           color: '#f8fafc',
@@ -45,6 +47,7 @@ export const WhatsAppButton = () => {
       {/* Botón Circular con Icono Oficial de WhatsApp */}
       <a
         href={whatsappUrl}
+        className="whatsapp-btn"
         target="_blank"
         rel="noopener noreferrer"
         onMouseEnter={() => setIsHovered(true)}
