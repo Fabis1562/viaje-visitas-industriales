@@ -156,6 +156,43 @@ export const AdminModal = ({
     setEditableTrip({ ...editableTrip, itinerary: updatedItinerary });
   };
 
+  const handleAddDay = () => {
+    const updatedItinerary = [...(editableTrip.itinerary || [])];
+    const newDayNum = updatedItinerary.length + 1;
+    updatedItinerary.push({
+      day: newDayNum,
+      dateTitle: `Día ${newDayNum} - Nuevas Actividades`,
+      theme: 'Jornada Académica e Industrial',
+      activities: [
+        {
+          time: '08:00 AM',
+          title: 'Desayuno Buffet',
+          location: 'Hotel Azure',
+          desc: 'Desayuno completo incluido.'
+        },
+        {
+          time: '10:00 AM',
+          title: 'Visita Técnica / Ponencia',
+          location: 'Empresa Sede',
+          desc: 'Recorrido técnico y sesión de preguntas.'
+        }
+      ]
+    });
+    setEditableTrip({ ...editableTrip, itinerary: updatedItinerary });
+  };
+
+  const handleRemoveDay = (dayIndex) => {
+    if (window.confirm(`¿Estás seguro de eliminar el Día ${dayIndex + 1} de este itinerario?`)) {
+      const updatedItinerary = [...editableTrip.itinerary];
+      updatedItinerary.splice(dayIndex, 1);
+      const renumbered = updatedItinerary.map((d, idx) => ({
+        ...d,
+        day: idx + 1
+      }));
+      setEditableTrip({ ...editableTrip, itinerary: renumbered });
+    }
+  };
+
   const handleSaveFirebaseConfig = (e) => {
     e.preventDefault();
     localStorage.setItem('viaje_firebase_config', JSON.stringify(fbConfig));
@@ -705,13 +742,25 @@ export const AdminModal = ({
                     <div key={dayIdx} className="glass-panel" style={{ padding: '1.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
                         <span className="badge badge-emerald">Día {dayObj.day || dayIdx + 1}</span>
-                        <button 
-                          onClick={() => handleAddItineraryActivity(dayIdx)}
-                          className="btn btn-secondary"
-                          style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                        >
-                          <Plus size={14} /> Agregar Actividad / Horario
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <button 
+                            onClick={() => handleAddItineraryActivity(dayIdx)}
+                            className="btn btn-secondary"
+                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                          >
+                            <Plus size={14} /> Agregar Actividad / Horario
+                          </button>
+                          {editableTrip.itinerary?.length > 1 && (
+                            <button 
+                              onClick={() => handleRemoveDay(dayIdx)}
+                              className="btn btn-danger"
+                              style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}
+                              title="Eliminar este día del itinerario"
+                            >
+                              <Trash2 size={14} /> Eliminar Día
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
@@ -809,14 +858,25 @@ export const AdminModal = ({
                     </div>
                   ))}
 
-                  <button 
-                    onClick={handleSaveTripGeneral}
-                    className="btn btn-primary"
-                    style={{ padding: '0.9rem', width: '100%' }}
-                  >
-                    <Save size={18} />
-                    <span>Guardar Itinerario Completo</span>
-                  </button>
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    <button 
+                      type="button"
+                      onClick={handleAddDay}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.9rem 1.25rem', flex: 1, minWidth: '220px' }}
+                    >
+                      <Plus size={18} />
+                      <span>Agregar Nuevo Día al Itinerario</span>
+                    </button>
+                    <button 
+                      onClick={handleSaveTripGeneral}
+                      className="btn btn-primary"
+                      style={{ padding: '0.9rem 1.25rem', flex: 2, minWidth: '220px' }}
+                    >
+                      <Save size={18} />
+                      <span>Guardar Itinerario Completo ({editableTrip.itinerary?.length || 0} Días)</span>
+                    </button>
+                  </div>
                 </div>
               )}
 

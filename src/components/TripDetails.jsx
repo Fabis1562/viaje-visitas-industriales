@@ -209,7 +209,7 @@ export const TripDetails = ({ trip }) => {
                 <div>
                   <div className="info-label">Fecha y Hora Estimada de Llegada</div>
                   <div className="info-val">
-                    {log?.returnTrip?.date || '18 de Octubre 2026'} • {log?.returnTrip?.time || '10:30 PM'}
+                    {log?.returnTrip?.date || '19 de Octubre 2026'} • {log?.returnTrip?.time || '10:30 PM'}
                   </div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                     Sujeto a condiciones de tránsito y paradas reglamentarias de chofer.

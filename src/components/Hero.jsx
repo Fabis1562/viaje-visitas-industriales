@@ -34,6 +34,8 @@ export const Hero = ({ trip, registeredCount }) => {
   const capacity = trip?.capacity || 45;
   const availableSpots = Math.max(0, capacity - registeredCount);
   const occupancyPercentage = Math.min(100, Math.round((registeredCount / capacity) * 100));
+  const daysCount = trip?.itinerary?.length || 5;
+  const nightsCount = Math.max(1, daysCount - 1);
 
   return (
     <header id="inicio" className="hero-section">
@@ -74,7 +76,7 @@ export const Hero = ({ trip, registeredCount }) => {
                   <span className="stat-label">Fechas</span>
                 </div>
                 <div className="stat-value" style={{ fontSize: '1.25rem' }}>
-                  {trip?.itinerary?.length || 4} Días / 3 Noches
+                  {daysCount} Días / {nightsCount} Noches
                 </div>
               </div>
 

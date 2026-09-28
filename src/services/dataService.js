@@ -55,7 +55,7 @@ export const INITIAL_TRIP_DATA = {
       notes: 'Llegar puntuales con credencial escolar vigente e INE.'
     },
     returnTrip: {
-      date: '2026-10-18',
+      date: '2026-10-19',
       time: '10:30 PM',
       estimatedArrival: 'Mismo punto de partida (Explanada del Instituto)',
       notes: 'Se notificará por grupo de WhatsApp el avance en carretera.'
@@ -102,24 +102,37 @@ export const INITIAL_TRIP_DATA = {
     },
     {
       day: 3,
-      dateTitle: 'Sábado 17 de Octubre - Prácticas de Campo y Cultura',
-      theme: 'Laboratorios Especializados y Convivencia',
+      dateTitle: 'Sábado 17 de Octubre - Prácticas de Campo y Talleres',
+      theme: 'Laboratorios Especializados y Sistemas Mecatrónicos',
       activities: [
         { time: '08:00 AM', title: 'Desayuno Buffet', location: 'Hotel Azure', desc: 'Desayuno caliente incluido.' },
         { time: '09:30 AM', title: 'Taller Práctico / Workshop Universitario', location: 'Campus Universitario Tecnológico', desc: 'Taller interactivo en laboratorios de simulación y sistemas mecatrónicos.' },
         { time: '01:30 PM', title: 'Comida Típica Regional', location: 'Mercado Gastronómico Tradicional', desc: 'Experiencia gastronómica y convivencia estudiantil.' },
         { time: '04:00 PM', title: 'Visita Cultural y Mirador', location: 'Mirador del Obispado / Museo', desc: 'Fotografía grupal oficial de la generación y tiempo libre supervisado.' },
-        { time: '08:30 PM', title: 'Noche de Convivencia y Clausura Académica', location: 'Terraza del Hotel', desc: 'Entrega de reconocimientos de participación y charla de clausura.' }
+        { time: '08:30 PM', title: 'Cena Grupal y Actividad de Integración', location: 'Restaurante Local', desc: 'Convivencia e intercambio de experiencias entre semestres.' }
       ]
     },
     {
       day: 4,
-      dateTitle: 'Domingo 18 de Octubre - Check-out y Regreso a Casa',
-      theme: 'Cierre de Prácticas y Trayecto de Retorno',
+      dateTitle: 'Domingo 18 de Octubre - Ecosistema de Innovación & Cultura',
+      theme: 'Museos de Ciencia, Tecnología y Networking Estudiantil',
       activities: [
-        { time: '08:30 AM', title: 'Desayuno y Check-out del Hotel', location: 'Lobby Hotel Azure', desc: 'Revisión de habitaciones, entrega de llaves y carga de equipaje en autobús.' },
-        { time: '10:30 AM', title: 'Última Parada Comercial / Souvenirs', location: 'Centro Comercial Galerías', desc: 'Tiempo para compras personales y alimentos para el camino.' },
-        { time: '01:00 PM', title: 'Salida Oficial en Carretera', location: 'Autopista de Retorno', desc: 'Inicio del viaje de regreso con paradas en casetas para refrigerio.' },
+        { time: '08:30 AM', title: 'Desayuno Buffet en Hotel', location: 'Comedor Hotel Azure', desc: 'Desayuno buffet completo para todo el contingente.' },
+        { time: '10:00 AM', title: 'Visita Técnica: Museo de Acero Horno 3', location: 'Parque Fundidora', desc: 'Recorrido por la galería de historia de la industria del acero y laboratorio de física aplicada.' },
+        { time: '01:30 PM', title: 'Almuerzo Grupal', location: 'Zona Fundidora / Paseo Santa Lucía', desc: 'Comida y tiempo de recreación supervisada.' },
+        { time: '04:00 PM', title: 'Sesión de Retos Tecnológicos y Networking', location: 'Centro de Emprendimiento', desc: 'Mesa redonda sobre proyectos de titulación e impacto en el mercado laboral.' },
+        { time: '08:30 PM', title: 'Noche de Gala y Clausura Académica', location: 'Terraza del Hotel', desc: 'Entrega de reconocimientos de participación y charla de clausura.' }
+      ]
+    },
+    {
+      day: 5,
+      dateTitle: 'Lunes 19 de Octubre - Check-out, Última Visita y Regreso',
+      theme: 'Cierre de Prácticas, Check-out y Trayecto de Retorno',
+      activities: [
+        { time: '08:00 AM', title: 'Desayuno y Check-out del Hotel', location: 'Lobby Hotel Azure', desc: 'Revisión de habitaciones, entrega de llaves y carga de equipaje en autobús.' },
+        { time: '09:30 AM', title: 'Visita Técnica de Cierre: Centro de Distribución y Logística', location: 'Parque Logístico Norte', desc: 'Conocimiento de sistemas de almacenamiento automatizado y cadenas de suministro.' },
+        { time: '01:00 PM', title: 'Última Parada Comercial y Comida', location: 'Centro Comercial Galerías', desc: 'Tiempo para alimentos del camino y compra de souvenirs.' },
+        { time: '02:30 PM', title: 'Salida Oficial en Carretera', location: 'Autopista de Retorno', desc: 'Inicio del viaje de regreso con paradas en casetas para refrigerio.' },
         { time: '10:30 PM', title: 'Arribo a la Explanada del Instituto', location: 'Campus de Origen', desc: 'Recepción por familiares, entrega de equipaje y fin del viaje de prácticas.' }
       ]
     }
@@ -209,7 +222,24 @@ export const getTripInfo = async () => {
   const localTrip = localStorage.getItem('viaje_practicas_info');
   if (localTrip) {
     try {
-      return JSON.parse(localTrip);
+      const parsed = JSON.parse(localTrip);
+      // Si la versión guardada en el navegador aún tenía el itinerario previo de 4 días,
+      // actualizamos automáticamente a los 5 días oficiales para evitar datos obsoletos.
+      if (parsed && Array.isArray(parsed.itinerary) && parsed.itinerary.length < 5) {
+        const migrated = {
+          ...INITIAL_TRIP_DATA,
+          ...parsed,
+          itinerary: INITIAL_TRIP_DATA.itinerary,
+          logistics: {
+            ...INITIAL_TRIP_DATA.logistics,
+            ...(parsed.logistics || {}),
+            returnTrip: INITIAL_TRIP_DATA.logistics.returnTrip
+          }
+        };
+        localStorage.setItem('viaje_practicas_info', JSON.stringify(migrated));
+        return migrated;
+      }
+      return parsed;
     } catch {
       // ignore
     }
