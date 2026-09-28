@@ -51,13 +51,13 @@ export const TripDetails = ({ trip }) => {
                 Lugar de Destino
               </span>
               <h3 style={{ fontSize: '1.6rem', fontWeight: 700 }}>
-                {dest.city || 'Monterrey, Nuevo León'} • {dest.highlight || 'Parque Tecnológico y Hub Industrial'}
+                {dest.city?.trim() || '¡Destino Sorpresa! (Por anunciar)'} • {dest.highlight?.trim() || 'Ruta Tecnológica y de Innovación'}
               </h3>
             </div>
           </div>
 
           <p style={{ color: 'var(--text-muted)', fontSize: '1rem', lineHeight: '1.7' }}>
-            {dest.description || 'Inmersión técnica en centros de desarrollo tecnológico, plantas industriales de manufactura inteligente y laboratorios universitarios. Podrás conocer de cerca el entorno laboral y los procesos productivos de la industria más avanzada.'}
+            {dest.description?.trim() || 'El destino oficial de nuestro viaje de prácticas 2027 se mantendrá en reserva como sorpresa y será anunciado por el comité organizador. Conoceremos plantas industriales de manufactura avanzada, centros de robótica y tecnología de primer nivel.'}
           </p>
 
           <div>
@@ -86,7 +86,7 @@ export const TripDetails = ({ trip }) => {
             />
             <div style={{ position: 'absolute', top: '1.25rem', left: '1.25rem' }}>
               <span className="badge badge-amber">
-                ⭐ {hotel.category || '4 Estrellas Superior'}
+                ⭐ {hotel.category?.trim() || '4 Estrellas Superior'}
               </span>
             </div>
           </div>
@@ -99,16 +99,16 @@ export const TripDetails = ({ trip }) => {
             </div>
 
             <h3 style={{ fontSize: '1.85rem', fontWeight: 800 }}>
-              {hotel.name || 'Azure Hotel & Suites'}
+              {hotel.name?.trim() ? hotel.name : 'Hotel Sede Ejecutivo (Por confirmar)'}
             </h3>
 
             <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-cyan)', fontSize: '0.9rem' }}>
               <MapPin size={16} />
-              {hotel.address || 'Av. Constitución #1250, Zona Metropolitana'}
+              {hotel.address?.trim() ? hotel.address : 'Zona Hotelera Ejecutiva de Primer Nivel'}
             </p>
 
             <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: '1.6' }}>
-              {hotel.description || 'Instalaciones de categoría diseñadas para el confort y la seguridad de los alumnos. Habitaciones climatizadas, salas de estudio y desayuno tipo buffet incluido todos los días del viaje.'}
+              {hotel.description?.trim() || 'Instalaciones de categoría diseñadas para el confort y la seguridad de los alumnos. Habitaciones climatizadas, salas de estudio y desayuno tipo buffet incluido todos los días del viaje.'}
             </p>
 
             <div>

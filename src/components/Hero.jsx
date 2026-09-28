@@ -70,7 +70,7 @@ export const Hero = ({ trip, registeredCount }) => {
             </div>
 
             <h1 className="hero-title">
-              {trip?.title || 'Viaje de Prácticas Académicas 2026'}
+              {trip?.title || 'Viaje de Prácticas Académicas 2027'}
             </h1>
 
             <p className="hero-desc">
@@ -85,7 +85,7 @@ export const Hero = ({ trip, registeredCount }) => {
                   <span className="stat-label">Destino</span>
                 </div>
                 <div className="stat-value" style={{ fontSize: '1.25rem' }}>
-                  {trip?.destination?.city || 'Monterrey, N.L.'}
+                  {trip?.destination?.city?.trim() || '¡Destino Sorpresa!'}
                 </div>
               </div>
 
@@ -152,10 +152,10 @@ export const Hero = ({ trip, registeredCount }) => {
                 </span>
               </div>
               <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#fff' }}>
-                {trip?.destination?.highlight || 'Distrito de Innovación y Tecnología'}
+                {trip?.destination?.highlight?.trim() || 'Ruta Tecnológica y de Innovación'}
               </h3>
               <p style={{ fontSize: '0.88rem', color: '#cbd5e1' }}>
-                Salida: {trip?.logistics?.departure?.date || '15 de Octubre 2026'} • {trip?.logistics?.departure?.time || '06:00 AM'}
+                Salida: {trip?.logistics?.departure?.date || '5 de Abril 2027'} • {trip?.logistics?.departure?.time || '06:00 AM'}
               </p>
 
               {/* Caja de Cuenta Regresiva */}

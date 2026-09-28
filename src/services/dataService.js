@@ -20,26 +20,26 @@ export const INITIAL_TRIP_DATA = {
   capacity: 45,
   registrationDeadline: '2026-11-15',
   destination: {
-    city: 'Monterrey, Nuevo León',
+    city: '¡Destino Sorpresa! (Por anunciar)',
     country: 'México',
-    highlight: 'Distrito de Innovación y Parque de Investigación Tecnológica (PIIT)',
-    description: 'Recorrido técnico e inmersión industrial en empresas líderes de desarrollo de software, robótica industrial y centros de manufactura avanzada. Los alumnos tendrán ponencias directas con ingenieros en planta y sesiones de reclutamiento para residencias profesionales.',
+    highlight: 'Ruta Tecnológica y Parques Industriales',
+    description: 'Inmersión técnica en centros de desarrollo tecnológico, plantas industriales de manufactura inteligente y laboratorios universitarios. El destino sede oficial se mantendrá en reserva y será anunciado por el comité organizador.',
     imageUrl: '/hero-destiny.jpg',
     visitingSpots: [
       { name: 'Centro de Desarrollo Tecnológico & TI', type: 'Visita Técnica' },
       { name: 'Planta de Automatización y Robótica', type: 'Práctica de Campo' },
       { name: 'Parque de Investigación e Innovación', type: 'Ponencia y Networking' },
-      { name: 'Paseo Santa Lucía & Parque Fundidora', type: 'Actividad Cultural' }
+      { name: 'Recorrido Cultural y Centro Histórico', type: 'Actividad Cultural' }
     ]
   },
   hotel: {
-    name: 'Azure Hotel & Suites Centro',
+    name: 'Hotel Sede Ejecutivo (Por confirmar)',
     category: '4 Estrellas Superior',
-    address: 'Av. Constitución #1250, Zona Centro Metropolitano',
+    address: 'Zona Hotelera Ejecutiva de Primer Nivel',
     description: 'Hotel moderno de negocios con instalaciones de primer nivel, diseñado para grupos de viaje con seguridad privada, habitaciones cuádruples y dobles equipadas, y desayuno tipo buffet incluido todos los días.',
     imageUrl: '/hotel-resort.jpg',
     amenities: [
-      'Desayuno Buffet Americano Incluido',
+      'Desayuno Buffet Diario Incluido',
       'WiFi de Alta Velocidad en Habitaciones y Áreas Comunes',
       'Alberca climatizada y Terraza de descanso',
       'Habitaciones con Clima, TV Smart y Baño Privado',
@@ -49,16 +49,16 @@ export const INITIAL_TRIP_DATA = {
   },
   logistics: {
     departure: {
-      date: '2026-10-15',
+      date: '2027-04-05',
       time: '06:00 AM',
-      meetingPoint: 'Explanada Principal del Instituto (Frente a Biblioteca)',
+      meetingPoint: 'Punto de Reunión Oficial (Por confirmar)',
       boardingTime: '05:30 AM',
       notes: 'Llegar puntuales con credencial escolar vigente e INE.'
     },
     returnTrip: {
-      date: '2026-10-19',
-      time: '10:30 PM',
-      estimatedArrival: 'Mismo punto de partida (Explanada del Instituto)',
+      date: '2027-04-09',
+      time: '07:30 PM',
+      estimatedArrival: 'Mismo punto de partida',
       notes: 'Se notificará por grupo de WhatsApp el avance en carretera.'
     },
     transport: {
@@ -76,65 +76,65 @@ export const INITIAL_TRIP_DATA = {
   itinerary: [
     {
       day: 1,
-      dateTitle: 'Jueves 15 de Octubre - Salida y Llegada a Destino',
+      dateTitle: 'Día 1 - Salida y Llegada a Destino',
       theme: 'Trayecto, Check-in y Encuentro Grupal',
       activities: [
-        { time: '05:30 AM', title: 'Cita y Pase de Lista', location: 'Explanada del Instituto', desc: 'Recepción de equipaje, revisión de documentos y asignación de asientos.' },
-        { time: '06:00 AM', title: 'Salida en Autobús Gran Turismo', location: 'Carretera Nacional', desc: 'Inicio del viaje de prácticas con paradas técnicas para almuerzo ligero.' },
-        { time: '01:30 PM', title: 'Llegada y Check-in en Hotel Azure', location: 'Hotel Azure & Suites', desc: 'Entrega de llaves, asignación de habitaciones y desempaque.' },
+        { time: '05:30 AM', title: 'Cita y Pase de Lista', location: 'Punto de Reunión Oficial', desc: 'Recepción de equipaje, revisión de documentos y asignación de asientos.' },
+        { time: '06:00 AM', title: 'Salida en Autobús Gran Turismo', location: 'Carretera / Autopista', desc: 'Inicio del viaje de prácticas con paradas técnicas para refrigerio.' },
+        { time: '01:30 PM', title: 'Llegada y Check-in en Hotel Sede', location: 'Hotel Ejecutivo', desc: 'Entrega de llaves, asignación de habitaciones y desempaque.' },
         { time: '03:30 PM', title: 'Almuerzo Buffet de Bienvenida', location: 'Restaurante del Hotel', desc: 'Comida incluida para todo el contingente estudiantil.' },
-        { time: '05:30 PM', title: 'Recorrido de Integración y Paseo Histórico', location: 'Parque Fundidora / Santa Lucía', desc: 'Paseo guiado por el parque industrial histórico y museos de tecnología.' },
-        { time: '08:30 PM', title: 'Cena Libre y Descanso', location: 'Zona Restaurantera Centro', desc: 'Retorno al hotel a las 10:30 PM para descanso reglamentario.' }
+        { time: '05:30 PM', title: 'Recorrido de Integración y Centro Histórico', location: 'Zona Turística y Cultural', desc: 'Paseo guiado de bienvenida y recorrido cultural.' },
+        { time: '08:30 PM', title: 'Cena Libre y Descanso', location: 'Zona Gastronómica', desc: 'Retorno al hotel para descanso reglamentario.' }
       ]
     },
     {
       day: 2,
-      dateTitle: 'Viernes 16 de Octubre - Inmersión Industrial Técnica',
+      dateTitle: 'Día 2 - Inmersión Industrial Técnica',
       theme: 'Visitas Técnicas y Ponencias con Líderes del Sector',
       activities: [
-        { time: '07:30 AM', title: 'Desayuno Buffet en Hotel', location: 'Comedor Hotel Azure', desc: 'Desayuno completo para recargar energía antes de la jornada.' },
+        { time: '07:30 AM', title: 'Desayuno Buffet en Hotel', location: 'Comedor del Hotel', desc: 'Desayuno completo para recargar energía antes de la jornada.' },
         { time: '08:45 AM', title: 'Traslado al Parque de Investigación Tecnológica', location: 'Unidad de Transporte', desc: 'Salida puntual con código de vestimenta formal/bata de laboratorio.' },
         { time: '09:30 AM', title: 'Visita Técnica 1: Centro de Innovación & Software', location: 'Hub de Desarrollo Tecnológico', desc: 'Demostración de arquitectura de servidores en la nube, ciberseguridad y pipelines de IA.' },
         { time: '01:00 PM', title: 'Comida de Networking', location: 'Cafetería del Parque Científico', desc: 'Intercambio con ponentes y alumnos residentes.' },
         { time: '02:30 PM', title: 'Visita Técnica 2: Planta de Manufactura Automatizada', location: 'Línea de Robótica y PLC', desc: 'Supervisión en vivo de brazos robóticos, control numérico y control de calidad.' },
-        { time: '06:30 PM', title: 'Retorno a Hotel y Tiempo de Aseo', location: 'Hotel Azure', desc: 'Descanso previo a la cena.' },
+        { time: '06:30 PM', title: 'Retorno a Hotel y Tiempo de Aseo', location: 'Hotel Sede', desc: 'Descanso previo a la cena.' },
         { time: '08:00 PM', title: 'Cena Grupal y Taller de Preguntas y Respuestas', location: 'Salón de Eventos del Hotel', desc: 'Evaluación del aprendizaje del día y asesoría para residencias profesionales.' }
       ]
     },
     {
       day: 3,
-      dateTitle: 'Sábado 17 de Octubre - Prácticas de Campo y Talleres',
+      dateTitle: 'Día 3 - Prácticas de Campo y Talleres',
       theme: 'Laboratorios Especializados y Sistemas Mecatrónicos',
       activities: [
-        { time: '08:00 AM', title: 'Desayuno Buffet', location: 'Hotel Azure', desc: 'Desayuno caliente incluido.' },
+        { time: '08:00 AM', title: 'Desayuno Buffet', location: 'Hotel Sede', desc: 'Desayuno caliente incluido.' },
         { time: '09:30 AM', title: 'Taller Práctico / Workshop Universitario', location: 'Campus Universitario Tecnológico', desc: 'Taller interactivo en laboratorios de simulación y sistemas mecatrónicos.' },
         { time: '01:30 PM', title: 'Comida Típica Regional', location: 'Mercado Gastronómico Tradicional', desc: 'Experiencia gastronómica y convivencia estudiantil.' },
-        { time: '04:00 PM', title: 'Visita Cultural y Mirador', location: 'Mirador del Obispado / Museo', desc: 'Fotografía grupal oficial de la generación y tiempo libre supervisado.' },
+        { time: '04:00 PM', title: 'Visita Cultural y Mirador', location: 'Mirador Panorámico / Museo', desc: 'Fotografía grupal oficial de la generación y tiempo libre supervisado.' },
         { time: '08:30 PM', title: 'Cena Grupal y Actividad de Integración', location: 'Restaurante Local', desc: 'Convivencia e intercambio de experiencias entre semestres.' }
       ]
     },
     {
       day: 4,
-      dateTitle: 'Domingo 18 de Octubre - Ecosistema de Innovación & Cultura',
+      dateTitle: 'Día 4 - Ecosistema de Innovación & Cultura',
       theme: 'Museos de Ciencia, Tecnología y Networking Estudiantil',
       activities: [
-        { time: '08:30 AM', title: 'Desayuno Buffet en Hotel', location: 'Comedor Hotel Azure', desc: 'Desayuno buffet completo para todo el contingente.' },
-        { time: '10:00 AM', title: 'Visita Técnica: Museo de Acero Horno 3', location: 'Parque Fundidora', desc: 'Recorrido por la galería de historia de la industria del acero y laboratorio de física aplicada.' },
-        { time: '01:30 PM', title: 'Almuerzo Grupal', location: 'Zona Fundidora / Paseo Santa Lucía', desc: 'Comida y tiempo de recreación supervisada.' },
+        { time: '08:30 AM', title: 'Desayuno Buffet en Hotel', location: 'Comedor del Hotel', desc: 'Desayuno buffet completo para todo el contingente.' },
+        { time: '10:00 AM', title: 'Visita Técnica: Museo de Ciencia e Historia Industrial', location: 'Complejo Cultural y Tecnológico', desc: 'Recorrido por la galería de historia de la industria y laboratorio de física aplicada.' },
+        { time: '01:30 PM', title: 'Almuerzo Grupal', location: 'Zona Turística', desc: 'Comida y tiempo de recreación supervisada.' },
         { time: '04:00 PM', title: 'Sesión de Retos Tecnológicos y Networking', location: 'Centro de Emprendimiento', desc: 'Mesa redonda sobre proyectos de titulación e impacto en el mercado laboral.' },
         { time: '08:30 PM', title: 'Noche de Gala y Clausura Académica', location: 'Terraza del Hotel', desc: 'Entrega de reconocimientos de participación y charla de clausura.' }
       ]
     },
     {
       day: 5,
-      dateTitle: 'Lunes 19 de Octubre - Check-out, Última Visita y Regreso',
+      dateTitle: 'Día 5 - Check-out, Última Visita y Regreso',
       theme: 'Cierre de Prácticas, Check-out y Trayecto de Retorno',
       activities: [
-        { time: '08:00 AM', title: 'Desayuno y Check-out del Hotel', location: 'Lobby Hotel Azure', desc: 'Revisión de habitaciones, entrega de llaves y carga de equipaje en autobús.' },
-        { time: '09:30 AM', title: 'Visita Técnica de Cierre: Centro de Distribución y Logística', location: 'Parque Logístico Norte', desc: 'Conocimiento de sistemas de almacenamiento automatizado y cadenas de suministro.' },
-        { time: '01:00 PM', title: 'Última Parada Comercial y Comida', location: 'Centro Comercial Galerías', desc: 'Tiempo para alimentos del camino y compra de souvenirs.' },
+        { time: '08:00 AM', title: 'Desayuno y Check-out del Hotel', location: 'Lobby del Hotel Sede', desc: 'Revisión de habitaciones, entrega de llaves y carga de equipaje en autobús.' },
+        { time: '09:30 AM', title: 'Visita Técnica de Cierre: Centro de Distribución y Logística', location: 'Parque Logístico', desc: 'Conocimiento de sistemas de almacenamiento automatizado y cadenas de suministro.' },
+        { time: '01:00 PM', title: 'Última Parada Comercial y Comida', location: 'Centro Comercial', desc: 'Tiempo para alimentos del camino y compra de recuerdos.' },
         { time: '02:30 PM', title: 'Salida Oficial en Carretera', location: 'Autopista de Retorno', desc: 'Inicio del viaje de regreso con paradas en casetas para refrigerio.' },
-        { time: '10:30 PM', title: 'Arribo a la Explanada del Instituto', location: 'Campus de Origen', desc: 'Recepción por familiares, entrega de equipaje y fin del viaje de prácticas.' }
+        { time: '07:30 PM', title: 'Arribo al Punto de Partida', location: 'Campus de Origen', desc: 'Recepción por familiares, entrega de equipaje y fin del viaje de prácticas.' }
       ]
     }
   ]
@@ -224,12 +224,18 @@ export const getTripInfo = async () => {
   if (localTrip) {
     try {
       const parsed = JSON.parse(localTrip);
-      // Si la versión guardada en el navegador aún tenía el itinerario previo de 4 días,
-      // actualizamos automáticamente a los 5 días oficiales para evitar datos obsoletos.
-      if (parsed && Array.isArray(parsed.itinerary) && parsed.itinerary.length < 5) {
+      // Si la versión guardada en el navegador aún tenía el itinerario previo de 4 días
+      // o nombres de destinos anteriores, actualizamos automáticamente al formato sorpresa oficial.
+      if (parsed && (
+        (Array.isArray(parsed.itinerary) && parsed.itinerary.length < 5) ||
+        (parsed.destination?.city && parsed.destination.city.includes('Monterrey')) ||
+        (parsed.hotel?.address && parsed.hotel.address.includes('Constitución'))
+      )) {
         const migrated = {
           ...INITIAL_TRIP_DATA,
           ...parsed,
+          destination: INITIAL_TRIP_DATA.destination,
+          hotel: INITIAL_TRIP_DATA.hotel,
           itinerary: INITIAL_TRIP_DATA.itinerary,
           logistics: {
             ...INITIAL_TRIP_DATA.logistics,
