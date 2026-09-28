@@ -22,7 +22,7 @@ import {
   clearDailySubmissionLimit 
 } from '../services/dataService';
 
-export const RegistrationSection = ({ onRegistrationSuccess, tripTitle }) => {
+export const RegistrationSection = ({ onRegistrationSuccess, tripTitle, registrationDeadline }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     controlNumber: '',
@@ -42,6 +42,21 @@ export const RegistrationSection = ({ onRegistrationSuccess, tripTitle }) => {
   // Los 9 semestres solicitados
   const SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
   const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+  const formatDeadlineDate = (dateStr) => {
+    if (!dateStr) return '15 de Noviembre de 2026';
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        const mIdx = parseInt(parts[1], 10) - 1;
+        return `${parseInt(parts[2], 10)} de ${months[mIdx]} de ${parts[0]}`;
+      }
+    } catch {
+      // ignore
+    }
+    return dateStr;
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -170,6 +185,23 @@ export const RegistrationSection = ({ onRegistrationSuccess, tripTitle }) => {
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Tarjeta de Fecha Límite */}
+              <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: '0.9rem', border: '1px solid rgba(245, 158, 11, 0.4)', background: 'rgba(245, 158, 11, 0.08)' }}>
+                <Clock size={22} style={{ color: 'var(--accent-amber)', flexShrink: 0, marginTop: '0.15rem' }} />
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                    <h4 style={{ fontSize: '0.98rem', fontWeight: 700, color: '#fbbf24' }}>Fecha Límite de Registro</h4>
+                    <span className="badge badge-amber" style={{ fontSize: '0.72rem', padding: '0.12rem 0.45rem' }}>Oficial</span>
+                  </div>
+                  <p style={{ fontSize: '0.92rem', color: '#f8fafc', fontWeight: 700 }}>
+                    {formatDeadlineDate(registrationDeadline || '2026-11-15')}
+                  </p>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                    Cierre oficial para apartar lugares de autobús y confirmar habitaciones con el hotel.
+                  </p>
+                </div>
+              </div>
+
               <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: '0.9rem' }}>
                 <CheckCircle size={22} style={{ color: 'var(--accent-emerald)', flexShrink: 0, marginTop: '0.1rem' }} />
                 <div>

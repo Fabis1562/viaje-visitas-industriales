@@ -514,14 +514,28 @@ export const AdminModal = ({
                         onChange={(e) => setEditableTrip({ ...editableTrip, subtitle: e.target.value })}
                       />
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">Cupo Máximo de Alumnos:</label>
-                      <input 
-                        type="number" 
-                        className="form-input" 
-                        value={editableTrip.capacity || 45} 
-                        onChange={(e) => setEditableTrip({ ...editableTrip, capacity: Number(e.target.value) })}
-                      />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Cupo Máximo de Alumnos:</label>
+                        <input 
+                          type="number" 
+                          className="form-input" 
+                          value={editableTrip.capacity || 70} 
+                          onChange={(e) => setEditableTrip({ ...editableTrip, capacity: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Fecha Límite de Registro:</label>
+                        <input 
+                          type="date" 
+                          className="form-input" 
+                          value={editableTrip.registrationDeadline || '2026-11-15'} 
+                          onChange={(e) => setEditableTrip({ ...editableTrip, registrationDeadline: e.target.value })}
+                        />
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                          Fecha máxima para apartar hotel y transporte.
+                        </span>
+                      </div>
                     </div>
                   </div>
 

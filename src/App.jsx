@@ -84,6 +84,7 @@ export function App() {
         <RegistrationSection 
           onRegistrationSuccess={handleRegistrationSuccess}
           tripTitle={tripData?.title}
+          registrationDeadline={tripData?.registrationDeadline}
         />
       </main>
 

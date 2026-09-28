@@ -37,16 +37,35 @@ export const Hero = ({ trip, registeredCount }) => {
   const daysCount = trip?.itinerary?.length || 5;
   const nightsCount = Math.max(1, daysCount - 1);
 
+  const formatDeadline = (dateStr) => {
+    if (!dateStr) return '15 de Noviembre 2026';
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        const mIdx = parseInt(parts[1], 10) - 1;
+        return `${parseInt(parts[2], 10)} de ${months[mIdx]} ${parts[0]}`;
+      }
+    } catch {
+      // ignore
+    }
+    return dateStr;
+  };
+
   return (
     <header id="inicio" className="hero-section">
       <div className="container">
         <div className="hero-grid">
           {/* Columna Izquierda: Información Principal */}
           <div className="hero-content">
-            <div className="hero-pill">
+            <div className="hero-pill" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
               <span className="badge badge-cyan">
                 <Sparkles size={14} />
                 Convocatoria Abierta • 1° a 9° Semestre
+              </span>
+              <span className="badge badge-amber" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid rgba(245, 158, 11, 0.4)', background: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24' }}>
+                <Clock size={13} />
+                Límite de Registro: {formatDeadline(trip?.registrationDeadline || '2026-11-15')}
               </span>
             </div>
 

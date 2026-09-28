@@ -18,6 +18,7 @@ export const INITIAL_TRIP_DATA = {
   institution: 'Instituto Tecnológico / Universidad',
   career: 'Ingeniería y Áreas Afines (1° a 9° Semestre)',
   capacity: 45,
+  registrationDeadline: '2026-11-15',
   destination: {
     city: 'Monterrey, Nuevo León',
     country: 'México',
