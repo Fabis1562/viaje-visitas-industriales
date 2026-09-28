@@ -53,7 +53,7 @@ export const Footer = ({ onOpenAdmin, trip }) => {
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
               <a 
-                href="https://wa.me/524931703238?text=Hola%2C%20tengo%20dudas%20sobre%20el%20Viaje%20de%20Pr%C3%A1cticas%202026"
+                href="https://wa.me/524931703238?text=Hola%2C%20tengo%20dudas%20sobre%20el%20Viaje%20de%20Pr%C3%A1cticas%202027"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ 

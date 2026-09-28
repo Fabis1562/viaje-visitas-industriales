@@ -4,7 +4,7 @@ export const WhatsAppButton = () => {
   const [isHovered, setIsHovered] = useState(false);
   
   // Enlace directo al chat sin mostrar el número telefónico en pantalla
-  const whatsappUrl = "https://wa.me/524931703238?text=Hola%2C%20tengo%20dudas%20sobre%20el%20Viaje%20de%20Pr%C3%A1cticas%202026";
+  const whatsappUrl = "https://wa.me/524931703238?text=Hola%2C%20tengo%20dudas%20sobre%20el%20Viaje%20de%20Pr%C3%A1cticas%202027";
 
   return (
     <aside 
