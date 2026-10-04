@@ -1,5 +1,5 @@
 import React from 'react';
-import { Compass, Phone, ShieldCheck, Heart } from 'lucide-react';
+import { Compass, Phone, ShieldCheck, Heart, Lock } from 'lucide-react';
 
 export const Footer = ({ onOpenAdmin, trip }) => {
 
@@ -70,10 +70,23 @@ export const Footer = ({ onOpenAdmin, trip }) => {
               </a>
               <button 
                 onClick={onOpenAdmin}
-                className="btn btn-secondary"
-                style={{ marginTop: '0.75rem', padding: '0.45rem 0.9rem', fontSize: '0.8rem', width: 'fit-content' }}
+                style={{ 
+                  marginTop: '0.75rem', 
+                  background: 'none', 
+                  border: 'none', 
+                  color: 'var(--text-subtle)', 
+                  fontSize: '0.75rem', 
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  opacity: 0.65,
+                  padding: 0,
+                  textAlign: 'left'
+                }}
+                title="Acceso restringido para organizadores (Atajo: Ctrl + Shift + A)"
               >
-                <ShieldCheck size={14} /> Panel Administrador
+                <Lock size={12} /> Acceso Organizadores (Ctrl+Shift+A)
               </button>
             </div>
           </div>

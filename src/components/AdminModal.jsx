@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Lock, 
@@ -10,33 +10,44 @@ import {
   Download, 
   Trash2, 
   Search, 
-  Filter, 
-  Check, 
   Plus, 
   Save, 
   AlertCircle,
-  Clock,
-  MapPin,
-  Hotel,
-  Bus,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  LogOut,
+  Mail,
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { exportStudentsToCSV } from '../services/exportService';
-import { isFirebaseConfigured, getFirebaseConfig } from '../services/firebase';
+import { 
+  isFirebaseConfigured, 
+  getFirebaseConfig, 
+  loginAdmin, 
+  logoutAdmin, 
+  onAdminAuthStateChanged 
+} from '../services/firebase';
+import { getRegistrations, deleteStudentRegistration } from '../services/dataService';
 
 export const AdminModal = ({ 
   isOpen, 
   onClose, 
-  registrations = [], 
   tripData, 
-  onUpdateTrip, 
-  onDeleteRegistration 
+  onUpdateTrip
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminUser, setAdminUser] = useState(null);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
   const [activeTab, setActiveTab] = useState('registros'); // 'registros', 'viaje', 'itinerario', 'firebase', 'seguridad'
+
+  // Registros protegidos (solo cargados tras verificación real en servidor)
+  const [adminRegistrations, setAdminRegistrations] = useState([]);
+  const [isLoadingRegs, setIsLoadingRegs] = useState(false);
+  const [regsError, setRegsError] = useState('');
 
   // Filtros de registros
   const [searchTerm, setSearchTerm] = useState('');
@@ -51,61 +62,99 @@ export const AdminModal = ({
   const [fbConfig, setFbConfig] = useState(getFirebaseConfig());
   const [fbSaveNotice, setFbSaveNotice] = useState('');
 
-  // Estado para cambio de contraseña de administrador
-  const [newAdminPassword, setNewAdminPassword] = useState('');
-  const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
-  const [passChangeSuccess, setPassChangeSuccess] = useState('');
-  const [passChangeError, setPassChangeError] = useState('');
+  // Escuchar sesión activa de Firebase
+  useEffect(() => {
+    const unsub = onAdminAuthStateChanged((user) => {
+      if (user) {
+        setAdminUser(user);
+        setIsAuthenticated(true);
+        setLoginError('');
+      } else {
+        setAdminUser(null);
+        setIsAuthenticated(false);
+        setAdminRegistrations([]);
+      }
+    });
+
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, []);
+
+  // Consultar registros de alumnos desde Firebase únicamente cuando el admin esté autenticado
+  const fetchRegistrations = async () => {
+    setIsLoadingRegs(true);
+    setRegsError('');
+    try {
+      const data = await getRegistrations();
+      setAdminRegistrations(data || []);
+    } catch (err) {
+      console.error('Error cargando alumnos:', err);
+      setRegsError('Acceso denegado en el servidor. Se requiere una sesión válida de administrador en Firebase Auth.');
+      setAdminRegistrations([]);
+    } finally {
+      setIsLoadingRegs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && isAuthenticated) {
+      fetchRegistrations();
+      setEditableTrip(tripData);
+    }
+  }, [isOpen, isAuthenticated]);
 
   if (!isOpen) return null;
 
-  const getExpectedPassword = () => {
-    return localStorage.getItem('viaje_admin_password') || import.meta.env.VITE_ADMIN_PASSWORD || 'ViajeAdmin2026';
-  };
-
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    const expected = getExpectedPassword();
-    if (password === expected) {
-      setIsAuthenticated(true);
-      setLoginError(false);
-      setEditableTrip(tripData);
-    } else {
-      setLoginError(true);
+    setLoginError('');
+    setIsSubmittingAuth(true);
+
+    try {
+      await loginAdmin(email.trim(), password);
+    } catch (err) {
+      console.error('Error de autenticación:', err);
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+        setLoginError('Correo o contraseña incorrectos. Verifica tus credenciales de organizador.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setLoginError('El proveedor de Correo/Contraseña no está habilitado en Firebase Authentication.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setLoginError('Demasiados intentos fallidos. Por seguridad, la cuenta se ha bloqueado temporalmente.');
+      } else {
+        setLoginError(err.message || 'Error al autenticar con el servidor.');
+      }
+    } finally {
+      setIsSubmittingAuth(false);
     }
   };
 
-  const handleChangePassword = (e) => {
-    e.preventDefault();
-    setPassChangeSuccess('');
-    setPassChangeError('');
-
-    if (!newAdminPassword || newAdminPassword.length < 5) {
-      setPassChangeError('La nueva contraseña debe tener al menos 5 caracteres.');
-      return;
+  const handleLogout = async () => {
+    try {
+      await logoutAdmin();
+      setIsAuthenticated(false);
+      setAdminUser(null);
+      setAdminRegistrations([]);
+      setEmail('');
+      setPassword('');
+    } catch (err) {
+      console.error('Error cerrando sesión:', err);
     }
-
-    if (newAdminPassword !== confirmAdminPassword) {
-      setPassChangeError('Las contraseñas no coinciden. Por favor verifícalas.');
-      return;
-    }
-
-    localStorage.setItem('viaje_admin_password', newAdminPassword);
-    setPassChangeSuccess('¡Contraseña de administrador actualizada con éxito!');
-    setNewAdminPassword('');
-    setConfirmAdminPassword('');
   };
 
-  const handleResetPassword = () => {
-    if (window.confirm('¿Deseas restablecer la contraseña a la predeterminada del archivo .env?')) {
-      localStorage.removeItem('viaje_admin_password');
-      setPassChangeSuccess('Contraseña restablecida a: ' + (import.meta.env.VITE_ADMIN_PASSWORD || 'ViajeAdmin2026'));
-      setPassChangeError('');
+  const handleDeleteStudent = async (id, name) => {
+    if (window.confirm(`¿Estás seguro de eliminar el registro de "${name || id}"?`)) {
+      try {
+        await deleteStudentRegistration(id);
+        setAdminRegistrations(prev => prev.filter(r => r.id !== id));
+      } catch (err) {
+        alert('Error al eliminar registro: ' + (err.message || 'Error en Firebase'));
+      }
     }
   };
 
   // Filtrado de alumnos
-  const filteredStudents = registrations.filter(s => {
+  const filteredStudents = adminRegistrations.filter(s => {
     const matchesSearch = 
       (s.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (s.controlNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -121,7 +170,7 @@ export const AdminModal = ({
   const semesterCounts = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(sem => {
     return {
       semester: sem,
-      count: registrations.filter(r => Number(r.semester) === sem).length
+      count: adminRegistrations.filter(r => Number(r.semester) === sem).length
     };
   });
 
@@ -217,60 +266,117 @@ export const AdminModal = ({
                 Panel de Administración del Viaje
               </h3>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Comité Organizador y Gestión de Datos
+                {isAuthenticated && adminUser ? (
+                  <span style={{ color: 'var(--accent-emerald)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <ShieldCheck size={13} /> Sesión verificada: {adminUser.email}
+                  </span>
+                ) : (
+                  'Comité Organizador y Gestión de Datos'
+                )}
               </p>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="btn btn-secondary" 
-            style={{ padding: '0.4rem 0.6rem', borderRadius: '50%' }}
-          >
-            <X size={18} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {isAuthenticated && (
+              <button 
+                onClick={handleLogout}
+                className="btn btn-secondary" 
+                title="Cerrar sesión de organizador"
+                style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <LogOut size={14} />
+                <span>Salir</span>
+              </button>
+            )}
+            <button 
+              onClick={onClose}
+              className="btn btn-secondary" 
+              style={{ padding: '0.4rem 0.6rem', borderRadius: '50%' }}
+              title="Cerrar panel"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        {/* Si no está autenticado: Pantalla de Login */}
+        {/* Si no está autenticado: Pantalla de Login Seguro */}
         {!isAuthenticated ? (
-          <div className="modal-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '340px' }}>
-            <form onSubmit={handleLogin} style={{ maxWidth: '380px', width: '100%', textAlign: 'center' }}>
-              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.15)', color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
-                <Lock size={28} />
+          <div className="modal-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '380px' }}>
+            <form onSubmit={handleLogin} style={{ maxWidth: '400px', width: '100%', textAlign: 'center' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.12)', color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                <ShieldCheck size={32} />
               </div>
               
-              <h4 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+              <h4 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: '0.4rem' }}>
                 Acceso de Organizadores
               </h4>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-                Ingresa la contraseña de organizador para gestionar el viaje y la lista de interesados.
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+                Ingresa con tu cuenta de organizador verificada en Firebase Authentication.
               </p>
 
               {loginError && (
-                <div style={{ background: 'rgba(244,63,94,0.15)', color: '#fda4af', padding: '0.6rem', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', marginBottom: '1rem' }}>
-                  Contraseña incorrecta.
+                <div style={{ background: 'rgba(244,63,94,0.15)', border: '1px solid rgba(244,63,94,0.3)', color: '#fda4af', padding: '0.75rem', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', marginBottom: '1.25rem', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+                  <div>{loginError}</div>
                 </div>
               )}
 
               <div className="form-group" style={{ textAlign: 'left' }}>
-                <label className="form-label" htmlFor="adminPass">Contraseña:</label>
-                <input
-                  id="adminPass"
-                  type="password"
-                  required
-                  placeholder="Escribe tu contraseña"
-                  className="form-input"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoFocus
-                />
+                <label className="form-label" htmlFor="adminEmail">Correo de Organizador:</label>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    id="adminEmail"
+                    type="email"
+                    required
+                    placeholder="organizador@instituto.edu.mx"
+                    className="form-input"
+                    style={{ paddingLeft: '2.4rem' }}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoFocus
+                  />
+                </div>
               </div>
 
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '0.5rem' }}>
-                Entrar al Panel
+              <div className="form-group" style={{ textAlign: 'left' }}>
+                <label className="form-label" htmlFor="adminPass">Contraseña:</label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    id="adminPass"
+                    type="password"
+                    required
+                    placeholder="Ingresa tu contraseña"
+                    className="form-input"
+                    style={{ paddingLeft: '2.4rem' }}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                disabled={isSubmittingAuth}
+                style={{ width: '100%', marginTop: '0.8rem', padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+              >
+                {isSubmittingAuth ? (
+                  <>
+                    <RefreshCw size={16} className="spin-animation" />
+                    <span>Verificando credenciales...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock size={16} />
+                    <span>Iniciar Sesión de Administrador</span>
+                  </>
+                )}
               </button>
 
-              <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                🔒 Acceso restringido exclusivamente para organizadores y docentes del viaje.
+              <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-sm)', fontSize: '0.76rem', color: 'var(--text-subtle)', lineHeight: '1.4' }}>
+                🔒 <strong>Autenticación en Servidor:</strong> Protegido contra manipulación de código local y DevTools mediante reglas de seguridad en Firebase Firestore.
               </div>
             </form>
           </div>
@@ -283,7 +389,7 @@ export const AdminModal = ({
                 onClick={() => setActiveTab('registros')}
               >
                 <Users size={17} />
-                <span>Interesados ({registrations.length})</span>
+                <span>Interesados ({adminRegistrations.length})</span>
               </button>
 
               <button 
@@ -314,8 +420,8 @@ export const AdminModal = ({
                 className={`admin-tab ${activeTab === 'seguridad' ? 'active' : ''}`}
                 onClick={() => setActiveTab('seguridad')}
               >
-                <Key size={17} />
-                <span>Contraseña</span>
+                <ShieldCheck size={17} />
+                <span>Seguridad y Accesos</span>
               </button>
             </div>
 
@@ -324,19 +430,29 @@ export const AdminModal = ({
               {/* TAB 1: LISTA DE ALUMNOS REGISTRADOS */}
               {activeTab === 'registros' && (
                 <div>
+                  {regsError && (
+                    <div style={{ background: 'rgba(244, 63, 94, 0.15)', border: '1px solid rgba(244, 63, 94, 0.3)', color: '#fda4af', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <ShieldAlert size={22} style={{ flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontWeight: 700 }}>Acceso no autorizado en el servidor</div>
+                        <div style={{ fontSize: '0.85rem', marginTop: '0.2rem' }}>{regsError}</div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Resumen de Métricas */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                     <div className="glass-panel" style={{ padding: '1rem' }}>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>TOTAL REGISTRADOS</div>
                       <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
-                        {registrations.length} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>alumnos</span>
+                        {adminRegistrations.length} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>alumnos</span>
                       </div>
                     </div>
 
                     <div className="glass-panel" style={{ padding: '1rem' }}>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>CUPO DISPONIBLE</div>
                       <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>
-                        {Math.max(0, (editableTrip.capacity || 45) - registrations.length)} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>lugares</span>
+                        {Math.max(0, (editableTrip.capacity || 45) - adminRegistrations.length)} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>lugares</span>
                       </div>
                     </div>
 
@@ -403,14 +519,25 @@ export const AdminModal = ({
                       </select>
                     </div>
 
-                    <button 
-                      onClick={() => exportStudentsToCSV(filteredStudents, editableTrip.title)}
-                      className="btn btn-primary"
-                      style={{ padding: '0.65rem 1.25rem', whiteSpace: 'nowrap' }}
-                    >
-                      <Download size={16} />
-                      <span>Exportar a Excel / CSV</span>
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.6rem' }}>
+                      <button 
+                        onClick={fetchRegistrations}
+                        className="btn btn-secondary"
+                        disabled={isLoadingRegs}
+                        title="Recargar registros desde Firestore"
+                        style={{ padding: '0.65rem 0.9rem' }}
+                      >
+                        <RefreshCw size={15} className={isLoadingRegs ? 'spin-animation' : ''} />
+                      </button>
+                      <button 
+                        onClick={() => exportStudentsToCSV(filteredStudents, editableTrip.title)}
+                        className="btn btn-primary"
+                        style={{ padding: '0.65rem 1.25rem', whiteSpace: 'nowrap' }}
+                      >
+                        <Download size={16} />
+                        <span>Exportar a Excel / CSV</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Tabla de Alumnos */}
@@ -430,7 +557,14 @@ export const AdminModal = ({
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredStudents.length === 0 ? (
+                        {isLoadingRegs ? (
+                          <tr>
+                            <td colSpan="9" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                              <RefreshCw size={22} className="spin-animation" style={{ margin: '0 auto 0.5rem' }} />
+                              <div>Consultando registros de alumnos en Firebase Firestore...</div>
+                            </td>
+                          </tr>
+                        ) : filteredStudents.length === 0 ? (
                           <tr>
                             <td colSpan="9" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
                               No se encontraron registros con los criterios seleccionados.
@@ -460,11 +594,7 @@ export const AdminModal = ({
                               </td>
                               <td>
                                 <button 
-                                  onClick={() => {
-                                    if (confirm(`¿Eliminar a ${st.fullName}?`)) {
-                                      onDeleteRegistration(st.id);
-                                    }
-                                  }}
+                                  onClick={() => handleDeleteStudent(st.id, st.fullName)}
                                   className="btn btn-danger"
                                   style={{ padding: '0.35rem 0.6rem' }}
                                   title="Eliminar registro"
@@ -1021,110 +1151,111 @@ export const AdminModal = ({
                 </div>
               )}
 
-              {/* TAB 5: SEGURIDAD Y CAMBIO DE CONTRASEÑA */}
+              {/* TAB 5: SEGURIDAD Y CONTROL DE ACCESO (FIREBASE AUTH) */}
               {activeTab === 'seguridad' && (
-                <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-                  <div className="glass-panel" style={{ padding: '1.75rem', marginBottom: '1.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                <div style={{ maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  
+                  {/* Tarjeta de Sesión Activa */}
+                  <div className="glass-panel" style={{ padding: '1.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ background: 'rgba(16, 185, 129, 0.12)', padding: '0.65rem', borderRadius: 'var(--radius-md)', color: 'var(--accent-emerald)' }}>
+                          <ShieldCheck size={26} />
+                        </div>
+                        <div>
+                          <h4 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fff' }}>
+                            Sesión de Organizador Activa
+                          </h4>
+                          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                            Autenticación criptográfica mediante Google Firebase Auth.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={handleLogout}
+                        className="btn btn-secondary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem' }}
+                      >
+                        <LogOut size={15} />
+                        <span>Cerrar Sesión Segura</span>
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.9rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Correo Autorizado</div>
+                        <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>
+                          {adminUser?.email || 'admin@viaje-escolar.com'}
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.9rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Protección de Servidor</div>
+                        <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--accent-emerald)' }}>
+                          🟢 firestore.rules Activo
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tarjeta de Gestión de Cuentas en Firebase Console */}
+                  <div className="glass-panel" style={{ padding: '1.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
                       <div style={{ background: 'rgba(56, 189, 248, 0.12)', padding: '0.6rem', borderRadius: 'var(--radius-md)', color: 'var(--accent-cyan)' }}>
-                        <Key size={24} />
+                        <Key size={22} />
                       </div>
                       <div>
-                        <h4 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff' }}>
-                          Cambiar Contraseña de Administrador
+                        <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>
+                          Cómo Cambiar Contraseñas y Agregar Organizadores
                         </h4>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                          Modifica la contraseña de acceso a este panel de organizadores.
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                          La seguridad se gestiona directamente en la consola oficial de Google.
                         </p>
                       </div>
                     </div>
 
-                    {passChangeSuccess && (
-                      <div style={{ 
-                        background: 'rgba(16, 185, 129, 0.15)', 
-                        border: '1px solid rgba(16, 185, 129, 0.3)', 
-                        color: '#6ee7b7', 
-                        padding: '0.75rem 1rem', 
-                        borderRadius: 'var(--radius-md)', 
-                        marginBottom: '1.25rem',
-                        fontSize: '0.88rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
-                        <Check size={18} />
-                        <span>{passChangeSuccess}</span>
-                      </div>
-                    )}
-
-                    {passChangeError && (
-                      <div style={{ 
-                        background: 'rgba(244, 63, 94, 0.15)', 
-                        border: '1px solid rgba(244, 63, 94, 0.3)', 
-                        color: '#fda4af', 
-                        padding: '0.75rem 1rem', 
-                        borderRadius: 'var(--radius-md)', 
-                        marginBottom: '1.25rem',
-                        fontSize: '0.88rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
-                        <AlertCircle size={18} />
-                        <span>{passChangeError}</span>
-                      </div>
-                    )}
-
-                    <form onSubmit={handleChangePassword}>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="newPass">Nueva Contraseña:</label>
-                        <input
-                          id="newPass"
-                          type="password"
-                          required
-                          placeholder="Mínimo 5 caracteres"
-                          className="form-input"
-                          value={newAdminPassword}
-                          onChange={(e) => setNewAdminPassword(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="confirmPass">Confirmar Nueva Contraseña:</label>
-                        <input
-                          id="confirmPass"
-                          type="password"
-                          required
-                          placeholder="Repite la nueva contraseña"
-                          className="form-input"
-                          value={confirmAdminPassword}
-                          onChange={(e) => setConfirmAdminPassword(e.target.value)}
-                        />
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.8rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-                        <button type="submit" className="btn btn-primary">
-                          <Save size={16} /> Guardar Nueva Contraseña
-                        </button>
-                        <button 
-                          type="button" 
-                          onClick={handleResetPassword}
-                          className="btn btn-secondary"
-                        >
-                          Restablecer Contraseña Predeterminada
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-
-                  <div className="glass-panel" style={{ padding: '1.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    <div style={{ fontWeight: 600, color: '#fff', marginBottom: '0.4rem' }}>
-                      ℹ️ Información de Seguridad
+                    <div style={{ fontSize: '0.86rem', color: 'var(--text-muted)', lineHeight: '1.6', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <p>
+                        Para evitar que las contraseñas queden expuestas en el código fuente de la aplicación web o en GitHub, las cuentas se administran en <strong>Firebase Authentication</strong>:
+                      </p>
+                      <ol style={{ paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <li>Ingresa a <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-cyan)', textDecoration: 'underline' }}>console.firebase.google.com</a> y abre el proyecto <strong>viaje-escolar</strong>.</li>
+                        <li>En el menú lateral izquierdo, haz clic en <strong>Build</strong> y luego en <strong>Authentication</strong>.</li>
+                        <li>En la pestaña <strong>Users</strong> (Usuarios), puedes hacer clic en <strong>"Agregar usuario"</strong> para registrar a otro docente u organizador con su correo y contraseña.</li>
+                        <li>Para cambiar la contraseña de un usuario existente, haz clic en los 3 puntos al final de la fila del usuario y selecciona <strong>"Restablecer contraseña"</strong> o <strong>"Cambiar contraseña"</strong>.</li>
+                      </ol>
                     </div>
-                    <p style={{ lineHeight: '1.6' }}>
-                      La contraseña también puede ser configurada de forma permanente en el archivo <code>.env</code> con la variable <code>VITE_ADMIN_PASSWORD</code>.
-                    </p>
+
+                    <div style={{ marginTop: '1.25rem' }}>
+                      <a 
+                        href="https://console.firebase.google.com/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="btn btn-secondary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}
+                      >
+                        <ExternalLink size={15} />
+                        <span>Abrir Consola de Firebase</span>
+                      </a>
+                    </div>
                   </div>
+
+                  {/* Tarjeta Informativa de Blindaje */}
+                  <div className="glass-panel" style={{ padding: '1.25rem', border: '1px solid rgba(16, 185, 129, 0.3)', background: 'rgba(16, 185, 129, 0.04)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                      <ShieldCheck size={22} style={{ color: 'var(--accent-emerald)', flexShrink: 0, marginTop: '0.15rem' }} />
+                      <div style={{ fontSize: '0.84rem', lineHeight: '1.55' }}>
+                        <div style={{ fontWeight: 700, color: '#6ee7b7', marginBottom: '0.25rem' }}>
+                          Blindaje contra React DevTools y Consola del Navegador
+                        </div>
+                        <div style={{ color: 'var(--text-muted)' }}>
+                          Las consultas a la colección <code>interesados_viaje</code> son validadas en los servidores de Google con <code>request.auth != null</code>. Cualquier intento de modificar el código local o saltarse el login en el navegador es bloqueado automáticamente con <strong>Permission Denied</strong>.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               )}
 

@@ -18,6 +18,7 @@ export const INITIAL_TRIP_DATA = {
   institution: 'Instituto Tecnológico / Universidad',
   career: 'Ingeniería y Áreas Afines (1° a 9° Semestre)',
   capacity: 45,
+  registeredCount: 18,
   registrationDeadline: '2026-11-15',
   destination: {
     city: '¡Destino Sorpresa! (Por anunciar)',
@@ -275,7 +276,7 @@ export const saveTripInfo = async (newTripData) => {
   return { success: true, mode: 'local' };
 };
 
-// OBTENER LISTA DE ALUMNOS REGISTRADOS
+// OBTENER LISTA DE ALUMNOS REGISTRADOS (Acceso restringido para administradores)
 export const getRegistrations = async () => {
   const db = getDb();
   if (db) {
@@ -291,13 +292,14 @@ export const getRegistrations = async () => {
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt || new Date().toISOString()
         });
       });
-      if (items.length > 0) return items;
+      return items;
     } catch (err) {
-      console.warn('Error leyendo registros de Firebase, usando fallback local:', err);
+      console.warn('Error leyendo registros de Firebase (requiere sesión activa de administrador):', err);
+      throw err;
     }
   }
 
-  // Fallback LocalStorage
+  // Fallback LocalStorage (únicamente en modo sin conexión a Firebase)
   const localRegs = localStorage.getItem('viaje_registros_alumnos');
   if (localRegs) {
     try {
@@ -308,9 +310,7 @@ export const getRegistrations = async () => {
     }
   }
 
-  // Si no hay datos, inicializamos con los registros demo
-  localStorage.setItem('viaje_registros_alumnos', JSON.stringify(INITIAL_REGISTRATIONS));
-  return INITIAL_REGISTRATIONS;
+  return [];
 };
 
 // CONTROL DE LÍMITE DIARIO Y PREVENCIÓN DE SATURACIÓN DE FIREBASE
@@ -353,7 +353,7 @@ export const clearDailySubmissionLimit = () => {
   localStorage.removeItem('viaje_last_submitted_student');
 };
 
-// AGREGAR NUEVO REGISTRO DE ALUMNO CON PROTECCIÓN CONTRA SPAM
+// AGREGAR NUEVO REGISTRO DE ALUMNO CON PROTECCIÓN CONTRA SPAM Y PRIVACIDAD TOTAL
 export const registerStudent = async (studentData) => {
   // 1. Validar límite de 1 registro por día en el dispositivo
   const limitCheck = checkDailySubmissionLimit();
@@ -365,20 +365,7 @@ export const registerStudent = async (studentData) => {
     };
   }
 
-  // 2. Validar que el número de control no esté ya registrado (evita duplicados en Firestore)
   const normalizedControl = (studentData.controlNumber || '').trim().toUpperCase();
-  const existingRegs = await getRegistrations();
-  const isDuplicate = existingRegs.some(
-    r => (r.controlNumber || '').trim().toUpperCase() === normalizedControl
-  );
-
-  if (isDuplicate) {
-    return {
-      success: false,
-      error: 'duplicate_control_number',
-      message: `El número de control "${normalizedControl}" ya se encuentra registrado en la lista oficial. Si requieres modificar algún dato, contacta a los organizadores.`
-    };
-  }
 
   const record = {
     ...studentData,
@@ -397,20 +384,16 @@ export const registerStudent = async (studentData) => {
       });
       firebaseId = docRef.id;
     } catch (err) {
-      console.warn('Error registrando en Firebase, guardando en local:', err);
+      console.warn('Error registrando en Firebase:', err);
     }
   }
 
-  // Guardar en local storage para sincronización inmediata
   const newEntry = {
     ...record,
     id: firebaseId || 'reg-' + Date.now()
   };
 
-  const updated = [newEntry, ...existingRegs];
-  localStorage.setItem('viaje_registros_alumnos', JSON.stringify(updated));
-
-  // Registrar marca de tiempo del envío exitoso
+  // Registrar marca de tiempo del envío exitoso SOLO para este alumno en su dispositivo
   localStorage.setItem('viaje_last_submission_time', Date.now().toString());
   localStorage.setItem('viaje_last_submitted_student', JSON.stringify({
     fullName: newEntry.fullName,

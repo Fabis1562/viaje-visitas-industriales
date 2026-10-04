@@ -1,5 +1,11 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged 
+} from 'firebase/auth';
 
 // Obtiene la configuración de Firebase desde variables de entorno o de localStorage (para fácil configuración en UI)
 export const getFirebaseConfig = () => {
@@ -37,6 +43,7 @@ export const isFirebaseConfigured = () => {
 };
 
 let dbInstance = null;
+let authInstance = null;
 
 export const initFirestore = () => {
   if (!isFirebaseConfigured()) {
@@ -60,3 +67,51 @@ export const getDb = () => {
   }
   return dbInstance;
 };
+
+export const getFirebaseAuth = () => {
+  if (!isFirebaseConfigured()) {
+    return null;
+  }
+
+  try {
+    const config = getFirebaseConfig();
+    const app = getApps().length === 0 ? initializeApp(config) : getApp();
+    if (!authInstance) {
+      authInstance = getAuth(app);
+    }
+    return authInstance;
+  } catch (error) {
+    console.warn('No se pudo inicializar Firebase Auth:', error);
+    return null;
+  }
+};
+
+export const loginAdmin = async (email, password) => {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    throw new Error('Firebase Auth no está disponible o no está configurado.');
+  }
+  return await signInWithEmailAndPassword(auth, email, password);
+};
+
+export const logoutAdmin = async () => {
+  const auth = getFirebaseAuth();
+  if (auth) {
+    await signOut(auth);
+  }
+};
+
+export const onAdminAuthStateChanged = (callback) => {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    callback(null);
+    return () => {};
+  }
+  return onAuthStateChanged(auth, callback);
+};
+
+export const getCurrentAdminUser = () => {
+  const auth = getFirebaseAuth();
+  return auth?.currentUser || null;
+};
+

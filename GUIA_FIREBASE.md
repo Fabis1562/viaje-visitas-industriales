@@ -67,21 +67,57 @@ VITE_FIREBASE_APP_ID=1:123456789012:web:abcdef...
 
 ---
 
-## 🌐 Paso 5: ¿Cómo subir la página a la Web para que los alumnos la abran?
+## 🛡️ Paso 5: Autenticación Segura de Organizadores (Firebase Authentication)
 
-### Subir a Vercel (Recomendado, Gratis y en 1 minuto):
-1. Sube tu proyecto a GitHub (o arrastra la carpeta en la web de Vercel).
-2. Entra a [https://vercel.com/](https://vercel.com/) e inicia sesión con GitHub.
-3. Haz clic en **"Add New..."** > **Project** y selecciona el repositorio de `viaje`.
-4. En **Environment Variables**, agrega las mismas variables de Firebase de tu `.env` (si usaste Opción B).
-5. Pulsa **Deploy**.
-6. ¡Listo! Vercel te dará un enlace oficial (ejemplo: `https://viaje-practicas.vercel.app`) para compartirlo por WhatsApp a todos los semestres.
+Para evitar que los alumnos puedan acceder al panel de organizadores inspeccionando el código fuente:
+
+1. En la consola de Firebase, ve a **Compilación (Build)** > **Authentication**.
+2. Haz clic en **Comenzar** y activa el proveedor **Correo electrónico / Contraseña**.
+3. En la pestaña **Users** (Usuarios), haz clic en **"Agregar usuario"**.
+4. Ingresa el correo oficial del organizador (ejemplo: `organizador@instituto.edu.mx`) y una contraseña segura.
+5. ¡Listo! Solo las personas registradas en esta lista podrán iniciar sesión en el panel y consultar los datos sensibles de los alumnos.
 
 ---
 
-## 🛡️ Credenciales de Administrador para los Organizadores
-- **Contraseña del Panel Admin:** `admin123`
-- **Funcionalidades del Administrador:**
-  - Ver lista en tiempo real de alumnos interesados con búsqueda y filtros por semestre (1° al 9°) y grupo.
-  - Botón **"Exportar a Excel / CSV"** para descargar la lista oficial con un clic.
-  - Editar Lugar, Hotel, Salida, Regreso, Horarios e Itinerario sin tener que programar.
+## 🔒 Paso 6: Activar las Reglas de Seguridad en Firestore (`firestore.rules`)
+
+Para blindar la base de datos contra accesos no autorizados:
+
+1. En la consola de Firebase, ve a **Compilación (Build)** > **Firestore Database** > pestaña **Reglas** (Rules).
+2. Pega el contenido del archivo `firestore.rules` del proyecto:
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Configuración general del viaje: lectura pública, modificación solo administradores
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /config_viaje/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Datos privados de alumnos: registro público, lectura y borrado SOLO organizadores
+    match /interesados_viaje/{docId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
+
+    match /metadata_viaje/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
+```
+3. Haz clic en **Publicar** (Publish).
+4. Con esto, cualquier intento de un alumno de hackear la consola o usar React DevTools será rechazado automáticamente por Google con un error `403 Permission Denied`.
+
+---
+
+## 📱 Acceso al Panel de Organizadores
+- **Atajo rápido en el teclado:** Presiona `Ctrl + Shift + A` (o `Cmd + Shift + A` en Mac).
+- **Enlace secreto:** Agrega `#admin` al final de la URL del sitio.
+- **Acceso visual discreto:** Haz clic 3 veces en el logo oficial del viaje en la barra de navegación, o haz clic en "Acceso Organizadores" al final del pie de página.

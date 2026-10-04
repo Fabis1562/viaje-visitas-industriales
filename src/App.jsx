@@ -10,49 +10,65 @@ import { WhatsAppButton } from './components/WhatsAppButton';
 import { 
   getTripInfo, 
   saveTripInfo, 
-  getRegistrations, 
-  deleteStudentRegistration, 
   INITIAL_TRIP_DATA 
 } from './services/dataService';
 
 export function App() {
   const [tripData, setTripData] = useState(INITIAL_TRIP_DATA);
-  const [registrations, setRegistrations] = useState([]);
+  const [registeredCount, setRegisteredCount] = useState(INITIAL_TRIP_DATA.registeredCount || 18);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  // Cargar datos al iniciar
+  // Cargar únicamente información pública del viaje al iniciar (CERO fuga de datos de alumnos)
   useEffect(() => {
-    const loadAppData = async () => {
+    const loadPublicData = async () => {
       try {
-        const [trip, regs] = await Promise.all([
-          getTripInfo(),
-          getRegistrations()
-        ]);
-        if (trip) setTripData(trip);
-        if (regs) setRegistrations(regs);
+        const trip = await getTripInfo();
+        if (trip) {
+          setTripData(trip);
+          if (typeof trip.registeredCount === 'number') {
+            setRegisteredCount(trip.registeredCount);
+          }
+        }
       } catch (err) {
-        console.error('Error cargando datos de la app:', err);
-      } finally {
-        setLoading(false);
+        console.error('Error cargando información pública del viaje:', err);
       }
     };
 
-    loadAppData();
+    loadPublicData();
   }, []);
 
-  const handleRegistrationSuccess = (newStudent) => {
-    setRegistrations(prev => [newStudent, ...prev]);
+  // Atajo de teclado discreto (Ctrl + Shift + A) y hash de URL (#admin) para organizadores
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setIsAdminOpen(true);
+      }
+    };
+
+    const handleHash = () => {
+      if (window.location.hash === '#admin') {
+        setIsAdminOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('hashchange', handleHash);
+    handleHash();
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('hashchange', handleHash);
+    };
+  }, []);
+
+  const handleRegistrationSuccess = () => {
+    setRegisteredCount(prev => prev + 1);
   };
 
   const handleUpdateTrip = async (newTrip) => {
     setTripData(newTrip);
     await saveTripInfo(newTrip);
-  };
-
-  const handleDeleteRegistration = async (id) => {
-    await deleteStudentRegistration(id);
-    setRegistrations(prev => prev.filter(r => r.id !== id));
   };
 
   return (
@@ -67,7 +83,7 @@ export function App() {
         {/* Banner Principal con Convocatoria y Cuenta Regresiva */}
         <Hero 
           trip={tripData} 
-          registeredCount={registrations.length} 
+          registeredCount={registeredCount} 
         />
 
         {/* Detalles: Destino, Hotel Sede, Salida, Regreso y Transporte */}
@@ -98,10 +114,8 @@ export function App() {
       <AdminModal
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}
-        registrations={registrations}
         tripData={tripData}
         onUpdateTrip={handleUpdateTrip}
-        onDeleteRegistration={handleDeleteRegistration}
       />
 
       {/* Botón Flotante de Contacto por WhatsApp */}
