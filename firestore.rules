@@ -2,9 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Configuración general del viaje (itinerario, hotel, fechas, cupo, estadísticas públicas)
+    // Configuración general del viaje (itinerario, hotel, fechas, cupo)
     // - Lectura: Pública para todos los alumnos y visitantes
-    // - Escritura: Restringida a administradores autenticados o actualización segura de contadores
+    // - Escritura: Restringida a administradores autenticados
     match /config/{docId} {
       allow read: if true;
       allow write: if request.auth != null;
@@ -23,10 +23,11 @@ service cloud.firestore {
       allow read, update, delete: if request.auth != null;
     }
 
-    // Metadatos adicionales
+    // Metadatos y contador público (almacena únicamente el número entero de registrados para el banner)
+    // No contiene ningún dato personal de los alumnos
     match /metadata_viaje/{docId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
     }
   }
 }

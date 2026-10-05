@@ -8,7 +8,8 @@ import {
   deleteDoc,
   serverTimestamp,
   query,
-  orderBy
+  orderBy,
+  increment
 } from 'firebase/firestore';
 import { getDb, isFirebaseConfigured } from './firebase';
 
@@ -17,8 +18,8 @@ export const INITIAL_TRIP_DATA = {
   subtitle: 'Ruta Tecnológica, Innovación Industrial y Desarrollo Profesional',
   institution: 'Instituto Tecnológico / Universidad',
   career: 'Ingeniería y Áreas Afines (1° a 9° Semestre)',
-  capacity: 45,
-  registeredCount: 18,
+  capacity: 80,
+  registeredCount: 20,
   registrationDeadline: '2026-11-15',
   destination: {
     city: '¡Destino Sorpresa! (Por anunciar)',
@@ -276,6 +277,39 @@ export const saveTripInfo = async (newTripData) => {
   return { success: true, mode: 'local' };
 };
 
+// OBTENER CONTADOR PÚBLICO EN TIEMPO REAL (Seguro para visitantes, no expone datos de alumnos)
+export const getPublicRegisteredCount = async () => {
+  const db = getDb();
+  if (db) {
+    try {
+      const metaSnap = await getDoc(doc(db, 'metadata_viaje', 'contador'));
+      if (metaSnap.exists() && typeof metaSnap.data().count === 'number') {
+        return metaSnap.data().count;
+      }
+      const tripSnap = await getDoc(doc(db, 'config', 'viaje_practicas'));
+      if (tripSnap.exists() && typeof tripSnap.data().registeredCount === 'number') {
+        return tripSnap.data().registeredCount;
+      }
+    } catch (err) {
+      console.warn('Error leyendo contador público:', err);
+    }
+  }
+  return INITIAL_TRIP_DATA.registeredCount || 20;
+};
+
+// SINCRONIZAR CONTADOR PÚBLICO (Llamado al autenticar en AdminModal)
+export const syncPublicCount = async (count) => {
+  const db = getDb();
+  if (db) {
+    try {
+      await setDoc(doc(db, 'metadata_viaje', 'contador'), { count }, { merge: true });
+      await setDoc(doc(db, 'config', 'viaje_practicas'), { registeredCount: count }, { merge: true });
+    } catch (err) {
+      console.warn('Error sincronizando contador en Firebase:', err);
+    }
+  }
+};
+
 // OBTENER LISTA DE ALUMNOS REGISTRADOS (Acceso restringido para administradores)
 export const getRegistrations = async () => {
   const db = getDb();
@@ -383,6 +417,11 @@ export const registerStudent = async (studentData) => {
         createdAt: serverTimestamp()
       });
       firebaseId = docRef.id;
+
+      // Incrementar contador público en tiempo real sin exponer datos personales
+      await setDoc(doc(db, 'metadata_viaje', 'contador'), {
+        count: increment(1)
+      }, { merge: true });
     } catch (err) {
       console.warn('Error registrando en Firebase:', err);
     }

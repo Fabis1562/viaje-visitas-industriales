@@ -10,24 +10,30 @@ import { WhatsAppButton } from './components/WhatsAppButton';
 import { 
   getTripInfo, 
   saveTripInfo, 
+  getPublicRegisteredCount,
   INITIAL_TRIP_DATA 
 } from './services/dataService';
 
 export function App() {
   const [tripData, setTripData] = useState(INITIAL_TRIP_DATA);
-  const [registeredCount, setRegisteredCount] = useState(INITIAL_TRIP_DATA.registeredCount || 18);
+  const [registeredCount, setRegisteredCount] = useState(INITIAL_TRIP_DATA.registeredCount || 20);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
 
   // Cargar únicamente información pública del viaje al iniciar (CERO fuga de datos de alumnos)
   useEffect(() => {
     const loadPublicData = async () => {
       try {
-        const trip = await getTripInfo();
+        const [trip, count] = await Promise.all([
+          getTripInfo(),
+          getPublicRegisteredCount()
+        ]);
         if (trip) {
           setTripData(trip);
-          if (typeof trip.registeredCount === 'number') {
-            setRegisteredCount(trip.registeredCount);
-          }
+        }
+        if (typeof count === 'number') {
+          setRegisteredCount(count);
+        } else if (typeof trip?.registeredCount === 'number') {
+          setRegisteredCount(trip.registeredCount);
         }
       } catch (err) {
         console.error('Error cargando información pública del viaje:', err);
@@ -116,6 +122,7 @@ export function App() {
         onClose={() => setIsAdminOpen(false)}
         tripData={tripData}
         onUpdateTrip={handleUpdateTrip}
+        onSyncCount={setRegisteredCount}
       />
 
       {/* Botón Flotante de Contacto por WhatsApp */}

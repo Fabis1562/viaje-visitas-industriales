@@ -28,13 +28,14 @@ import {
   logoutAdmin, 
   onAdminAuthStateChanged 
 } from '../services/firebase';
-import { getRegistrations, deleteStudentRegistration } from '../services/dataService';
+import { getRegistrations, deleteStudentRegistration, syncPublicCount } from '../services/dataService';
 
 export const AdminModal = ({ 
   isOpen, 
   onClose, 
   tripData, 
-  onUpdateTrip
+  onUpdateTrip,
+  onSyncCount
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminUser, setAdminUser] = useState(null);
@@ -87,7 +88,11 @@ export const AdminModal = ({
     setRegsError('');
     try {
       const data = await getRegistrations();
-      setAdminRegistrations(data || []);
+      const list = data || [];
+      setAdminRegistrations(list);
+      // Sincronizar contador real hacia la vista principal y la base de datos
+      if (onSyncCount) onSyncCount(list.length);
+      syncPublicCount(list.length);
     } catch (err) {
       console.error('Error cargando alumnos:', err);
       setRegsError('Acceso denegado en el servidor. Se requiere una sesión válida de administrador en Firebase Auth.');
@@ -146,7 +151,10 @@ export const AdminModal = ({
     if (window.confirm(`¿Estás seguro de eliminar el registro de "${name || id}"?`)) {
       try {
         await deleteStudentRegistration(id);
-        setAdminRegistrations(prev => prev.filter(r => r.id !== id));
+        const updated = adminRegistrations.filter(r => r.id !== id);
+        setAdminRegistrations(updated);
+        if (onSyncCount) onSyncCount(updated.length);
+        syncPublicCount(updated.length);
       } catch (err) {
         alert('Error al eliminar registro: ' + (err.message || 'Error en Firebase'));
       }
