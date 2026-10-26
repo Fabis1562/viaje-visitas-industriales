@@ -22,7 +22,12 @@ import {
   clearDailySubmissionLimit 
 } from '../services/dataService';
 
-export const RegistrationSection = ({ onRegistrationSuccess, tripTitle, registrationDeadline }) => {
+export const RegistrationSection = ({ 
+  onRegistrationSuccess, 
+  tripTitle, 
+  registrationDeadline, 
+  accessControl 
+}) => {
   const [formData, setFormData] = useState({
     fullName: '',
     controlNumber: '',
@@ -38,10 +43,73 @@ export const RegistrationSection = ({ onRegistrationSuccess, tripTitle, registra
   const [errorMsg, setErrorMsg] = useState('');
   const [successData, setSuccessData] = useState(null);
   const [dailyLimit, setDailyLimit] = useState(() => checkDailySubmissionLimit());
+  const [openingTimeLeft, setOpeningTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, isPast: false });
 
   // Los 9 semestres solicitados
   const SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
   const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+  const openingDateStr = accessControl?.openingDate;
+  const isRegistrationScheduled = Boolean(
+    accessControl?.enabled && 
+    openingDateStr && 
+    accessControl?.lockMode === 'registration_only' &&
+    !openingTimeLeft.isPast
+  );
+
+  useEffect(() => {
+    if (!accessControl?.enabled || !openingDateStr || accessControl?.lockMode !== 'registration_only') return;
+
+    const calc = () => {
+      try {
+        const target = new Date(openingDateStr);
+        const now = new Date();
+        const diff = target.getTime() - now.getTime();
+        if (diff <= 0) {
+          setOpeningTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isPast: true });
+        } else {
+          setOpeningTimeLeft({
+            days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+            hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+            minutes: Math.floor((diff / 1000 / 60) % 60),
+            seconds: Math.floor((diff / 1000) % 60),
+            isPast: false
+          });
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    calc();
+    const timer = setInterval(calc, 1000);
+    return () => clearInterval(timer);
+  }, [accessControl?.enabled, openingDateStr, accessControl?.lockMode]);
+
+  const isDeadlineClosed = Boolean(
+    accessControl?.closeAfterDeadline &&
+    registrationDeadline &&
+    new Date() > new Date(`${registrationDeadline}T23:59:59`)
+  );
+
+  const formatOpeningDateTime = (isoDateStr) => {
+    if (!isoDateStr) return 'Próximamente';
+    try {
+      const date = new Date(isoDateStr);
+      if (isNaN(date.getTime())) return isoDateStr;
+      return date.toLocaleString('es-MX', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return isoDateStr;
+    }
+  };
 
   const formatDeadlineDate = (dateStr) => {
     if (!dateStr) return '15 de Noviembre de 2026';
@@ -282,6 +350,90 @@ export const RegistrationSection = ({ onRegistrationSuccess, tripTitle, registra
                     Ver Itinerario
                   </a>
                 </div>
+              </div>
+            ) : isRegistrationScheduled ? (
+              /* Tarjeta de Convocatoria Próxima a Abrir */
+              <div className="ticket-card" style={{ padding: '2.5rem 1.75rem', textAlign: 'center' }}>
+                <div className="ticket-icon" style={{ background: 'rgba(56, 189, 248, 0.12)', borderColor: 'rgba(56, 189, 248, 0.35)', color: 'var(--accent-cyan)' }}>
+                  <Clock size={36} />
+                </div>
+
+                <span className="badge badge-cyan" style={{ marginBottom: '0.8rem' }}>
+                  Convocatoria Próxima a Abrir
+                </span>
+
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+                  El registro de alumnos iniciará en:
+                </h3>
+
+                {/* Contador Regresivo */}
+                <div className="launch-countdown-grid" style={{ margin: '1.5rem 0' }}>
+                  <div className="launch-count-card">
+                    <span className="launch-count-val">{String(openingTimeLeft.days).padStart(2, '0')}</span>
+                    <span className="launch-count-label">Días</span>
+                  </div>
+                  <div className="launch-count-sep">:</div>
+                  <div className="launch-count-card">
+                    <span className="launch-count-val">{String(openingTimeLeft.hours).padStart(2, '0')}</span>
+                    <span className="launch-count-label">Horas</span>
+                  </div>
+                  <div className="launch-count-sep">:</div>
+                  <div className="launch-count-card">
+                    <span className="launch-count-val">{String(openingTimeLeft.minutes).padStart(2, '0')}</span>
+                    <span className="launch-count-label">Min</span>
+                  </div>
+                  <div className="launch-count-sep">:</div>
+                  <div className="launch-count-card launch-count-card-highlight">
+                    <span className="launch-count-val">{String(openingTimeLeft.seconds).padStart(2, '0')}</span>
+                    <span className="launch-count-label">Seg</span>
+                  </div>
+                </div>
+
+                <div style={{ background: 'rgba(15,23,42,0.8)', padding: '0.9rem 1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '1.25rem', display: 'inline-block' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>FECHA Y HORA DE APERTURA:</div>
+                  <strong style={{ color: '#fff', fontSize: '0.95rem' }}>{formatOpeningDateTime(accessControl.openingDate)}</strong>
+                </div>
+
+                {accessControl?.customMessage && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: '1.5', marginBottom: '1.25rem' }}>
+                    "{accessControl.customMessage}"
+                  </p>
+                )}
+
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-subtle)' }}>
+                  💡 <strong>Ten listos tus documentos:</strong> Tu número de control, teléfono de WhatsApp y semestre para asegurar tu lugar rápidamente.
+                </p>
+              </div>
+            ) : isDeadlineClosed ? (
+              /* Tarjeta de Registro Cerrado tras Fecha Límite */
+              <div className="ticket-card" style={{ padding: '2.5rem 1.75rem', textAlign: 'center' }}>
+                <div className="ticket-icon" style={{ background: 'rgba(244, 63, 94, 0.12)', borderColor: 'rgba(244, 63, 94, 0.35)', color: 'var(--accent-rose)' }}>
+                  <AlertCircle size={36} />
+                </div>
+
+                <span className="badge badge-amber" style={{ marginBottom: '0.8rem', background: 'rgba(244, 63, 94, 0.15)', color: '#fda4af', borderColor: 'rgba(244, 63, 94, 0.3)' }}>
+                  Convocatoria Concluida
+                </span>
+
+                <h3 style={{ fontSize: '1.45rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+                  Periodo de Registro Finalizado
+                </h3>
+
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+                  La fecha límite oficial ({formatDeadlineDate(registrationDeadline)}) ha concluido. El sistema ha cerrado los registros para proceder a la asignación de lugares, autobuses y reservaciones de hotel.
+                </p>
+
+                <div style={{ background: 'rgba(15,23,42,0.8)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '1.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Si deseas consultar si hay cancelaciones de última hora o solicitar ingreso a la lista de espera, comunícate con el comité organizador.
+                </div>
+
+                <a 
+                  href="#itinerario" 
+                  className="btn btn-secondary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem' }}
+                >
+                  Ver Itinerario del Viaje
+                </a>
               </div>
             ) : dailyLimit?.limited ? (
               /* Tarjeta de Límite Diario Activo (Anti-Saturación de Firebase) */

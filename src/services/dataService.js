@@ -21,6 +21,49 @@ export const INITIAL_TRIP_DATA = {
   capacity: 80,
   registeredCount: 20,
   registrationDeadline: '2026-11-15',
+  accessControl: {
+    enabled: false,
+    openingDate: '2026-10-15T08:00',
+    lockMode: 'full_page', // 'full_page' | 'registration_only'
+    customMessage: 'La plataforma oficial y el registro de alumnos para el viaje de prácticas abrirán en la fecha y hora indicadas. ¡Ten listos tus datos!',
+    closeAfterDeadline: false
+  },
+  paymentInfo: {
+    totalCost: 3500,
+    depositAmount: 500,
+    clabeReleaseDate: '2026-11-15T00:00:00',
+    forceClabeVisible: false,
+    bankName: 'BBVA México',
+    accountHolder: 'Comité Organizador del Viaje de Prácticas',
+    clabe: '012180015623489012',
+    accountNumber: '1562348901',
+    conceptFormat: 'No. Control + Primer Nombre',
+    whatsappReceipt: '7771234567',
+    notes: 'Una vez realizada tu transferencia o pago, envía tu comprobante en foto o PDF con tu nombre completo y número de control.',
+    installments: [
+      {
+        id: 1,
+        title: 'Anticipo Inicial (Apartado de Lugar)',
+        amount: 500,
+        deadline: '2026-11-20',
+        desc: 'Garantiza tu asiento exclusivo en el autobús y registro en lista oficial.'
+      },
+      {
+        id: 2,
+        title: 'Primer Abono (Hospedaje & Reservaciones)',
+        amount: 1500,
+        deadline: '2026-12-15',
+        desc: 'Bloqueo de habitaciones en el Hotel Sede Ejecutivo 4 Estrellas.'
+      },
+      {
+        id: 3,
+        title: 'Liquidación Final (Accesos Industriales)',
+        amount: 1500,
+        deadline: '2027-02-28',
+        desc: 'Finiquito de accesos a plantas, seguro de viajero y gafete oficial.'
+      }
+    ]
+  },
   destination: {
     city: '¡Destino Sorpresa! (Por anunciar)',
     country: 'México',
@@ -153,6 +196,9 @@ export const INITIAL_REGISTRATIONS = [
     group: 'A',
     phone: '5512345678',
     email: 'carlos.ramirez@instituto.edu.mx',
+    paymentStatus: 'deposit', // 'pending' | 'deposit' | 'full'
+    amountPaid: 500,
+    paymentNotes: 'Anticipo en efectivo entregado a organizador.',
     notes: 'Interesado en el área de desarrollo de software y nube.',
     createdAt: new Date(Date.now() - 3600000 * 24 * 3).toISOString()
   },
@@ -165,6 +211,9 @@ export const INITIAL_REGISTRATIONS = [
     group: 'B',
     phone: '5587654321',
     email: 'mariana.vega@instituto.edu.mx',
+    paymentStatus: 'full',
+    amountPaid: 3500,
+    paymentNotes: 'Liquidación completa por transferencia SPEI.',
     notes: 'Requiere menú vegetariano en comidas.',
     createdAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString()
   },
@@ -177,6 +226,9 @@ export const INITIAL_REGISTRATIONS = [
     group: 'A',
     phone: '5533445566',
     email: 'alejandro.morales@instituto.edu.mx',
+    paymentStatus: 'deposit',
+    amountPaid: 500,
+    paymentNotes: 'Apartó lugar el día de la junta informativa.',
     notes: 'Buscando empresas para residencias profesionales.',
     createdAt: new Date(Date.now() - 3600000 * 24 * 1).toISOString()
   },
@@ -189,6 +241,9 @@ export const INITIAL_REGISTRATIONS = [
     group: 'C',
     phone: '5577889900',
     email: 'valeria.hernandez@instituto.edu.mx',
+    paymentStatus: 'pending',
+    amountPaid: 0,
+    paymentNotes: '',
     notes: 'Primer viaje de prácticas.',
     createdAt: new Date(Date.now() - 3600000 * 12).toISOString()
   },
@@ -201,6 +256,9 @@ export const INITIAL_REGISTRATIONS = [
     group: 'A',
     phone: '5599887766',
     email: 'jorge.castro@instituto.edu.mx',
+    paymentStatus: 'pending',
+    amountPaid: 0,
+    paymentNotes: '',
     notes: 'Interesado en conocer las instalaciones.',
     createdAt: new Date(Date.now() - 3600000 * 4).toISOString()
   }
@@ -214,7 +272,19 @@ export const getTripInfo = async () => {
       const tripDocRef = doc(db, 'config', 'viaje_practicas');
       const snap = await getDoc(tripDocRef);
       if (snap.exists()) {
-        return { ...INITIAL_TRIP_DATA, ...snap.data() };
+        const snapData = snap.data();
+        return { 
+          ...INITIAL_TRIP_DATA, 
+          ...snapData,
+          accessControl: {
+            ...INITIAL_TRIP_DATA.accessControl,
+            ...(snapData.accessControl || {})
+          },
+          paymentInfo: {
+            ...INITIAL_TRIP_DATA.paymentInfo,
+            ...(snapData.paymentInfo || {})
+          }
+        };
       }
     } catch (err) {
       console.warn('Error leyendo viaje de Firebase, usando fallback local:', err);
@@ -226,8 +296,6 @@ export const getTripInfo = async () => {
   if (localTrip) {
     try {
       const parsed = JSON.parse(localTrip);
-      // Si la versión guardada en el navegador aún tenía el itinerario previo de 4 días
-      // o nombres de destinos anteriores, actualizamos automáticamente al formato sorpresa oficial.
       if (parsed && (
         (Array.isArray(parsed.itinerary) && parsed.itinerary.length < 5) ||
         (parsed.destination?.city && parsed.destination.city.includes('Monterrey')) ||
@@ -243,12 +311,31 @@ export const getTripInfo = async () => {
             ...INITIAL_TRIP_DATA.logistics,
             ...(parsed.logistics || {}),
             returnTrip: INITIAL_TRIP_DATA.logistics.returnTrip
+          },
+          accessControl: {
+            ...INITIAL_TRIP_DATA.accessControl,
+            ...(parsed.accessControl || {})
+          },
+          paymentInfo: {
+            ...INITIAL_TRIP_DATA.paymentInfo,
+            ...(parsed.paymentInfo || {})
           }
         };
         localStorage.setItem('viaje_practicas_info', JSON.stringify(migrated));
         return migrated;
       }
-      return parsed;
+      return {
+        ...INITIAL_TRIP_DATA,
+        ...parsed,
+        accessControl: {
+          ...INITIAL_TRIP_DATA.accessControl,
+          ...(parsed.accessControl || {})
+        },
+        paymentInfo: {
+          ...INITIAL_TRIP_DATA.paymentInfo,
+          ...(parsed.paymentInfo || {})
+        }
+      };
     } catch {
       // ignore
     }
@@ -315,8 +402,15 @@ export const getRegistrations = async () => {
   const db = getDb();
   if (db) {
     try {
-      const q = query(collection(db, 'interesados_viaje'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
+      let snapshot;
+      try {
+        const q = query(collection(db, 'interesados_viaje'), orderBy('createdAt', 'desc'));
+        snapshot = await getDocs(q);
+      } catch (orderErr) {
+        console.warn('Query con orderBy fallo (posible falta de indice), intentando lectura basica:', orderErr);
+        snapshot = await getDocs(collection(db, 'interesados_viaje'));
+      }
+
       const items = [];
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
@@ -326,6 +420,9 @@ export const getRegistrations = async () => {
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt || new Date().toISOString()
         });
       });
+
+      // Orden descendente seguro en cliente
+      items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       return items;
     } catch (err) {
       console.warn('Error leyendo registros de Firebase (requiere sesión activa de administrador):', err);
@@ -404,6 +501,9 @@ export const registerStudent = async (studentData) => {
   const record = {
     ...studentData,
     controlNumber: normalizedControl,
+    paymentStatus: studentData.paymentStatus || 'pending', // 'pending' | 'deposit' | 'full'
+    amountPaid: Number(studentData.amountPaid) || 0,
+    paymentNotes: studentData.paymentNotes || '',
     createdAt: new Date().toISOString()
   };
 
@@ -439,6 +539,8 @@ export const registerStudent = async (studentData) => {
     controlNumber: newEntry.controlNumber,
     semester: newEntry.semester,
     group: newEntry.group,
+    paymentStatus: newEntry.paymentStatus,
+    amountPaid: newEntry.amountPaid,
     createdAt: newEntry.createdAt
   }));
 
@@ -447,6 +549,25 @@ export const registerStudent = async (studentData) => {
     data: newEntry,
     syncedFirebase: Boolean(firebaseId)
   };
+};
+
+// ACTUALIZAR ESTADO DE PAGO DE UN ALUMNO (Solo administradores)
+export const updateStudentPaymentStatus = async (id, paymentData) => {
+  const db = getDb();
+  if (db && !id.startsWith('reg-') && !id.startsWith('demo-')) {
+    try {
+      await setDoc(doc(db, 'interesados_viaje', id), paymentData, { merge: true });
+    } catch (err) {
+      console.warn('Error actualizando pago en Firebase:', err);
+      throw err;
+    }
+  }
+
+  // Actualizar también en LocalStorage para modo local y persistencia
+  const localRegs = await getRegistrations();
+  const updated = localRegs.map(r => r.id === id ? { ...r, ...paymentData } : r);
+  localStorage.setItem('viaje_registros_alumnos', JSON.stringify(updated));
+  return updated;
 };
 
 // ELIMINAR REGISTRO DE ALUMNO

@@ -18,7 +18,12 @@ import {
   LogOut,
   Mail,
   ShieldCheck,
-  ShieldAlert
+  ShieldAlert,
+  Clock,
+  Check,
+  Printer,
+  DollarSign,
+  CreditCard
 } from 'lucide-react';
 import { exportStudentsToCSV } from '../services/exportService';
 import { 
@@ -28,7 +33,13 @@ import {
   logoutAdmin, 
   onAdminAuthStateChanged 
 } from '../services/firebase';
-import { getRegistrations, deleteStudentRegistration, syncPublicCount } from '../services/dataService';
+import { 
+  getRegistrations, 
+  deleteStudentRegistration, 
+  syncPublicCount,
+  updateStudentPaymentStatus
+} from '../services/dataService';
+import { PrintAttendanceModal } from './PrintAttendanceModal';
 
 export const AdminModal = ({ 
   isOpen, 
@@ -54,6 +65,9 @@ export const AdminModal = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSemester, setFilterSemester] = useState('todos');
   const [filterGroup, setFilterGroup] = useState('todos');
+  const [filterPayment, setFilterPayment] = useState('todos'); // 'todos' | 'pending' | 'deposit' | 'full'
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [paymentUpdateMsg, setPaymentUpdateMsg] = useState('');
 
   // Estado local para editar el viaje
   const [editableTrip, setEditableTrip] = useState(tripData);
@@ -95,7 +109,11 @@ export const AdminModal = ({
       syncPublicCount(list.length);
     } catch (err) {
       console.error('Error cargando alumnos:', err);
-      setRegsError('Acceso denegado en el servidor. Se requiere una sesión válida de administrador en Firebase Auth.');
+      if (err?.code === 'permission-denied') {
+        setRegsError('Firestore denegó el acceso (permission-denied). En tu Consola de Firebase > Firestore Database > Reglas (Rules), debes publicar las reglas que permiten a administradores autenticados leer la colección "interesados_viaje".');
+      } else {
+        setRegsError(`Error del servidor Firestore: ${err?.message || 'Acceso no disponible'}. Revisa la consola o las reglas de seguridad.`);
+      }
       setAdminRegistrations([]);
     } finally {
       setIsLoadingRegs(false);
@@ -161,6 +179,41 @@ export const AdminModal = ({
     }
   };
 
+  // Actualizar estado de pago de un alumno
+  const handleUpdateStudentPayment = async (studentId, studentName, newStatus) => {
+    const tCost = editableTrip?.paymentInfo?.totalCost || 3500;
+    const dAmount = editableTrip?.paymentInfo?.depositAmount || 500;
+    let amount = 0;
+    if (newStatus === 'deposit') amount = dAmount;
+    if (newStatus === 'full') amount = tCost;
+
+    try {
+      await updateStudentPaymentStatus(studentId, {
+        paymentStatus: newStatus,
+        amountPaid: amount,
+        paymentUpdatedAt: new Date().toISOString()
+      });
+
+      setAdminRegistrations(prev => prev.map(s => {
+        if (s.id === studentId) {
+          return {
+            ...s,
+            paymentStatus: newStatus,
+            amountPaid: amount,
+            paymentUpdatedAt: new Date().toISOString()
+          };
+        }
+        return s;
+      }));
+
+      const label = newStatus === 'full' ? `Liquidado ($${amount})` : newStatus === 'deposit' ? `Anticipo ($${amount})` : 'Pendiente';
+      setPaymentUpdateMsg(`Pago de "${studentName}" actualizado a: ${label}`);
+      setTimeout(() => setPaymentUpdateMsg(''), 3500);
+    } catch (err) {
+      alert('Error al actualizar el pago en Firebase: ' + (err.message || 'Error en servidor'));
+    }
+  };
+
   // Filtrado de alumnos
   const filteredStudents = adminRegistrations.filter(s => {
     const matchesSearch = 
@@ -170,9 +223,31 @@ export const AdminModal = ({
     
     const matchesSemester = filterSemester === 'todos' || String(s.semester) === String(filterSemester);
     const matchesGroup = filterGroup === 'todos' || s.group === filterGroup;
+    const matchesPayment = 
+      filterPayment === 'todos' || 
+      (filterPayment === 'pending' && (!s.paymentStatus || s.paymentStatus === 'pending')) ||
+      (filterPayment === 'deposit' && s.paymentStatus === 'deposit') ||
+      (filterPayment === 'full' && s.paymentStatus === 'full');
 
-    return matchesSearch && matchesSemester && matchesGroup;
+    return matchesSearch && matchesSemester && matchesGroup && matchesPayment;
   });
+
+  // Métricas financieras en tiempo real
+  const totalCost = editableTrip?.paymentInfo?.totalCost || 3500;
+  const depositAmount = editableTrip?.paymentInfo?.depositAmount || 500;
+
+  const totalRevenue = adminRegistrations.reduce((acc, curr) => {
+    const amt = Number(curr.amountPaid);
+    if (!isNaN(amt) && amt > 0) return acc + amt;
+    if (curr.paymentStatus === 'full') return acc + totalCost;
+    if (curr.paymentStatus === 'deposit') return acc + depositAmount;
+    return acc;
+  }, 0);
+
+  const studentsDepositCount = adminRegistrations.filter(r => r.paymentStatus === 'deposit').length;
+  const studentsFullCount = adminRegistrations.filter(r => r.paymentStatus === 'full').length;
+  const studentsPendingCount = adminRegistrations.filter(r => !r.paymentStatus || r.paymentStatus === 'pending').length;
+  const pendingRevenue = Math.max(0, (adminRegistrations.length * totalCost) - totalRevenue);
 
   // Estadísticas por semestre
   const semesterCounts = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(sem => {
@@ -190,6 +265,25 @@ export const AdminModal = ({
       setTimeout(() => setSaveStatus(''), 3000);
     } catch {
       setSaveStatus('error');
+    }
+  };
+
+  const formatDateTimePreview = (isoDateStr) => {
+    if (!isoDateStr) return 'Fecha no definida';
+    try {
+      const d = new Date(isoDateStr);
+      if (isNaN(d.getTime())) return isoDateStr;
+      return d.toLocaleString('es-MX', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return isoDateStr;
     }
   };
 
@@ -401,6 +495,14 @@ export const AdminModal = ({
               </button>
 
               <button 
+                className={`admin-tab ${activeTab === 'acceso' ? 'active' : ''}`}
+                onClick={() => setActiveTab('acceso')}
+              >
+                <Clock size={17} />
+                <span>Apertura y Acceso</span>
+              </button>
+
+              <button 
                 className={`admin-tab ${activeTab === 'viaje' ? 'active' : ''}`}
                 onClick={() => setActiveTab('viaje')}
               >
@@ -422,6 +524,14 @@ export const AdminModal = ({
               >
                 <Database size={17} />
                 <span>Conexión Firebase</span>
+              </button>
+
+              <button 
+                className={`admin-tab ${activeTab === 'pagos' ? 'active' : ''}`}
+                onClick={() => setActiveTab('pagos')}
+              >
+                <DollarSign size={17} />
+                <span>Control Pagos & CLABE</span>
               </button>
 
               <button 
@@ -448,26 +558,52 @@ export const AdminModal = ({
                     </div>
                   )}
 
-                  {/* Resumen de Métricas */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                  {paymentUpdateMsg && (
+                    <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#6ee7b7', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <Check size={18} style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{paymentUpdateMsg}</span>
+                    </div>
+                  )}
+
+                  {/* Resumen de Métricas Financieras y Operativas */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                     <div className="glass-panel" style={{ padding: '1rem' }}>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>TOTAL REGISTRADOS</div>
-                      <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
-                        {adminRegistrations.length} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>alumnos</span>
+                      <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>TOTAL REGISTRADOS</div>
+                      <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
+                        {adminRegistrations.length} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>alumnos</span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                        Cupo restante: {Math.max(0, (editableTrip.capacity || 80) - adminRegistrations.length)} lugares
+                      </div>
+                    </div>
+
+                    <div className="glass-panel" style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+                      <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>TOTAL RECAUDADO</div>
+                      <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>
+                        ${totalRevenue.toLocaleString('es-MX')} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>MXN</span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: '0.2rem' }}>
+                        🟢 {studentsFullCount} liquidados • 🔵 {studentsDepositCount} con anticipo
                       </div>
                     </div>
 
                     <div className="glass-panel" style={{ padding: '1rem' }}>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>CUPO DISPONIBLE</div>
-                      <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>
-                        {Math.max(0, (editableTrip.capacity || 45) - adminRegistrations.length)} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>lugares</span>
+                      <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>POR RECAUDAR / COBRAR</div>
+                      <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--accent-amber)' }}>
+                        ${pendingRevenue.toLocaleString('es-MX')} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>MXN</span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                        🟡 {studentsPendingCount} pendientes de pago
                       </div>
                     </div>
 
                     <div className="glass-panel" style={{ padding: '1rem' }}>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>BASE DE DATOS</div>
+                      <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>BASE DE DATOS</div>
                       <div style={{ fontSize: '1.1rem', fontWeight: 700, color: isFirebaseConfigured() ? 'var(--accent-emerald)' : 'var(--accent-amber)', marginTop: '0.3rem' }}>
-                        {isFirebaseConfigured() ? '🟢 Firestore Activo' : '🟡 Modo Local Activo'}
+                        {isFirebaseConfigured() ? '🟢 Firestore Activo' : '🟡 Modo Local'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                        Sincronización en tiempo real
                       </div>
                     </div>
                   </div>
@@ -487,10 +623,10 @@ export const AdminModal = ({
                     </div>
                   </div>
 
-                  {/* Barra de Filtros y Búsqueda */}
+                  {/* Barra de Filtros, Búsqueda y Botones de Acción */}
                   <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', gap: '0.75rem', flex: 1, minWidth: '280px' }}>
-                      <div style={{ position: 'relative', flex: 1 }}>
+                    <div style={{ display: 'flex', gap: '0.65rem', flex: 1, minWidth: '300px', flexWrap: 'wrap' }}>
+                      <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
                         <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                         <input
                           type="text"
@@ -504,11 +640,11 @@ export const AdminModal = ({
 
                       <select 
                         className="form-select" 
-                        style={{ width: '160px' }}
+                        style={{ width: '150px' }}
                         value={filterSemester}
                         onChange={(e) => setFilterSemester(e.target.value)}
                       >
-                        <option value="todos">Todos Semestres</option>
+                        <option value="todos">Semestres (Todos)</option>
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(s => (
                           <option key={s} value={s}>{s}° Semestre</option>
                         ))}
@@ -516,18 +652,30 @@ export const AdminModal = ({
 
                       <select 
                         className="form-select" 
-                        style={{ width: '130px' }}
+                        style={{ width: '125px' }}
                         value={filterGroup}
                         onChange={(e) => setFilterGroup(e.target.value)}
                       >
-                        <option value="todos">Todos Grupos</option>
+                        <option value="todos">Grupos (Todos)</option>
                         {['A', 'B', 'C', 'D', 'E', 'F'].map(g => (
                           <option key={g} value={g}>Grupo {g}</option>
                         ))}
                       </select>
+
+                      <select 
+                        className="form-select" 
+                        style={{ width: '160px' }}
+                        value={filterPayment}
+                        onChange={(e) => setFilterPayment(e.target.value)}
+                      >
+                        <option value="todos">Todos los Pagos</option>
+                        <option value="pending">🟡 Pendientes ({studentsPendingCount})</option>
+                        <option value="deposit">🔵 Con Anticipo ({studentsDepositCount})</option>
+                        <option value="full">🟢 Liquidados ({studentsFullCount})</option>
+                      </select>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.6rem' }}>
+                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                       <button 
                         onClick={fetchRegistrations}
                         className="btn btn-secondary"
@@ -537,18 +685,29 @@ export const AdminModal = ({
                       >
                         <RefreshCw size={15} className={isLoadingRegs ? 'spin-animation' : ''} />
                       </button>
+
+                      <button 
+                        onClick={() => setIsPrintModalOpen(true)}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.65rem 1.15rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.45rem', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', color: 'var(--accent-cyan)' }}
+                        title="Generar e imprimir lista de asistencia del autobús o gafetes en PDF"
+                      >
+                        <Printer size={16} />
+                        <span>Imprimir Lista / Gafetes</span>
+                      </button>
+
                       <button 
                         onClick={() => exportStudentsToCSV(filteredStudents, editableTrip.title)}
                         className="btn btn-primary"
-                        style={{ padding: '0.65rem 1.25rem', whiteSpace: 'nowrap' }}
+                        style={{ padding: '0.65rem 1.15rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
                       >
                         <Download size={16} />
-                        <span>Exportar a Excel / CSV</span>
+                        <span>Exportar a Excel</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* Tabla de Alumnos */}
+                  {/* Tabla de Alumnos con Control de Pagos */}
                   <div className="table-container">
                     <table className="data-table">
                       <thead>
@@ -556,10 +715,10 @@ export const AdminModal = ({
                           <th>No.</th>
                           <th>Nombre del Alumno</th>
                           <th>No. Control</th>
-                          <th>Edad</th>
                           <th>Semestre</th>
                           <th>Grupo</th>
-                          <th>Contacto WhatsApp</th>
+                          <th>WhatsApp</th>
+                          <th style={{ minWidth: '175px' }}>Estatus de Pago</th>
                           <th>Notas</th>
                           <th>Acción</th>
                         </tr>
@@ -579,43 +738,357 @@ export const AdminModal = ({
                             </td>
                           </tr>
                         ) : (
-                          filteredStudents.map((st, idx) => (
-                            <tr key={st.id || idx}>
-                              <td>{idx + 1}</td>
-                              <td style={{ fontWeight: 600, color: '#fff' }}>{st.fullName}</td>
-                              <td><span className="badge badge-cyan">{st.controlNumber}</span></td>
-                              <td>{st.age} años</td>
-                              <td><span className="badge badge-purple">{st.semester}° Sem</span></td>
-                              <td><strong>{st.group}</strong></td>
-                              <td>
-                                <a 
-                                  href={`https://wa.me/52${st.phone.replace(/[^0-9]/g, '')}`} 
-                                  target="_blank" 
-                                  rel="noreferrer"
-                                  style={{ color: 'var(--accent-emerald)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                                >
-                                  {st.phone}
-                                </a>
-                              </td>
-                              <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: '200px' }}>
-                                {st.notes || '-'}
-                              </td>
-                              <td>
-                                <button 
-                                  onClick={() => handleDeleteStudent(st.id, st.fullName)}
-                                  className="btn btn-danger"
-                                  style={{ padding: '0.35rem 0.6rem' }}
-                                  title="Eliminar registro"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </td>
-                            </tr>
-                          ))
+                          filteredStudents.map((st, idx) => {
+                            const isFull = st.paymentStatus === 'full';
+                            const isDeposit = st.paymentStatus === 'deposit';
+
+                            return (
+                              <tr key={st.id || idx}>
+                                <td>{idx + 1}</td>
+                                <td style={{ fontWeight: 600, color: '#fff' }}>{st.fullName}</td>
+                                <td><span className="badge badge-cyan">{st.controlNumber}</span></td>
+                                <td><span className="badge badge-purple">{st.semester}° Sem</span></td>
+                                <td><strong>{st.group}</strong></td>
+                                <td>
+                                  <a 
+                                    href={`https://wa.me/52${st.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${st.fullName}, te contactamos del Comité Organizador del Viaje de Prácticas 2026 respecto a tu registro.`)}`} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    style={{ color: 'var(--accent-emerald)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                                    title="Contactar al alumno por WhatsApp"
+                                  >
+                                    {st.phone}
+                                  </a>
+                                </td>
+                                <td>
+                                  {/* Control Interactivo de Pago por Alumno */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                    <select
+                                      value={st.paymentStatus || 'pending'}
+                                      onChange={(e) => handleUpdateStudentPayment(st.id, st.fullName, e.target.value)}
+                                      className="form-select"
+                                      style={{
+                                        padding: '0.25rem 0.5rem',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 700,
+                                        background: isFull 
+                                          ? 'rgba(16, 185, 129, 0.18)' 
+                                          : isDeposit 
+                                            ? 'rgba(56, 189, 248, 0.18)' 
+                                            : 'rgba(245, 158, 11, 0.18)',
+                                        color: isFull 
+                                          ? '#6ee7b7' 
+                                          : isDeposit 
+                                            ? '#7dd3fc' 
+                                            : '#fde68a',
+                                        border: isFull 
+                                          ? '1px solid rgba(16, 185, 129, 0.4)' 
+                                          : isDeposit 
+                                            ? '1px solid rgba(56, 189, 248, 0.4)' 
+                                            : '1px solid rgba(245, 158, 11, 0.4)',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <option value="pending" style={{ background: '#0f172a', color: '#fde68a' }}>🟡 Pendiente ($0)</option>
+                                      <option value="deposit" style={{ background: '#0f172a', color: '#7dd3fc' }}>🔵 Anticipo (${depositAmount})</option>
+                                      <option value="full" style={{ background: '#0f172a', color: '#6ee7b7' }}>🟢 Liquidado (${totalCost})</option>
+                                    </select>
+                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                      Abonado: <strong style={{ color: '#fff' }}>${(st.amountPaid || (isFull ? totalCost : isDeposit ? depositAmount : 0)).toLocaleString('es-MX')}</strong>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: '180px' }}>
+                                  {st.paymentNotes ? (
+                                    <span style={{ color: '#cbd5e1' }}>{st.paymentNotes}</span>
+                                  ) : st.notes ? (
+                                    <span>{st.notes}</span>
+                                  ) : '-'}
+                                </td>
+                                <td>
+                                  <button 
+                                    onClick={() => handleDeleteStudent(st.id, st.fullName)}
+                                    className="btn btn-danger"
+                                    style={{ padding: '0.35rem 0.6rem' }}
+                                    title="Eliminar registro"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
                         )}
                       </tbody>
                     </table>
                   </div>
+                </div>
+              )}
+
+              {/* TAB NUEVO: CONTROL DE APERTURA Y ACCESO A LA PÁGINA */}
+              {activeTab === 'acceso' && (
+                <div style={{ maxWidth: '780px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  
+                  {/* Feedback de Guardado */}
+                  {saveStatus === 'exito' && (
+                    <div style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', padding: '0.9rem 1.25rem', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <Check size={18} />
+                      <strong>¡Configuración de apertura y acceso guardada exitosamente en la base de datos!</strong>
+                    </div>
+                  )}
+
+                  {saveStatus === 'error' && (
+                    <div style={{ background: 'rgba(244,63,94,0.15)', border: '1px solid rgba(244,63,94,0.3)', color: '#fda4af', padding: '0.9rem 1.25rem', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <AlertCircle size={18} />
+                      <strong>Ocurrió un error al guardar la configuración. Intenta nuevamente.</strong>
+                    </div>
+                  )}
+
+                  {/* Encabezado y Estado en Tiempo Real */}
+                  <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                      <div className="icon-bubble icon-bubble-cyan">
+                        <Clock size={22} />
+                      </div>
+                      <div>
+                        <h4 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fff' }}>
+                          Fecha de Apertura y Control de Acceso a la Página
+                        </h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                          Define la fecha y hora programada en que los alumnos podrán ingresar a la web o al formulario de registro.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Banner de Estado Visual */}
+                    <div style={{ 
+                      marginTop: '1.25rem', 
+                      padding: '1.1rem 1.25rem', 
+                      borderRadius: 'var(--radius-md)', 
+                      background: editableTrip.accessControl?.enabled ? 'rgba(245, 158, 11, 0.08)' : 'rgba(16, 185, 129, 0.08)', 
+                      border: editableTrip.accessControl?.enabled ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(16, 185, 129, 0.35)' 
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                        <div style={{ fontSize: '1.35rem', marginTop: '0.05rem' }}>
+                          {editableTrip.accessControl?.enabled 
+                            ? (editableTrip.accessControl?.openingDate && new Date() < new Date(editableTrip.accessControl.openingDate) ? '⏳' : '✅') 
+                            : '🟢'}
+                        </div>
+                        <div style={{ fontSize: '0.88rem', lineHeight: '1.5', flex: 1 }}>
+                          <strong style={{ color: editableTrip.accessControl?.enabled ? '#fbbf24' : '#34d399', display: 'block', fontSize: '0.98rem', marginBottom: '0.25rem' }}>
+                            {editableTrip.accessControl?.enabled 
+                              ? (editableTrip.accessControl?.openingDate && new Date() < new Date(editableTrip.accessControl.openingDate)
+                                  ? 'Acceso Programado / Restringido para Visitantes'
+                                  : 'Apertura Cumplida (Plataforma ya desbloqueada)')
+                              : 'Acceso Totalmente Libre (Sin restricciones de fecha)'}
+                          </strong>
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            {editableTrip.accessControl?.enabled 
+                              ? (editableTrip.accessControl?.openingDate && new Date() < new Date(editableTrip.accessControl.openingDate)
+                                  ? `La página o el registro abrirán automáticamente el ${formatDateTimePreview(editableTrip.accessControl?.openingDate)}. Los organizadores pueden ingresar en cualquier momento con su contraseña.`
+                                  : `La fecha fijada (${formatDateTimePreview(editableTrip.accessControl?.openingDate)}) ya transcurrió. La plataforma está disponible para todos.`)
+                              : 'Cualquier estudiante puede ingresar a la página web y registrarse libremente sin ninguna cuenta regresiva previa.'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 1. Activar y Programar Fecha */}
+                  <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                    <h5 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: '1rem' }}>
+                      1. Programación de Fecha y Hora de Apertura
+                    </h5>
+
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', cursor: 'pointer', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.25rem' }}>
+                      <input 
+                        type="checkbox"
+                        checked={Boolean(editableTrip.accessControl?.enabled)}
+                        onChange={(e) => setEditableTrip({
+                          ...editableTrip,
+                          accessControl: {
+                            ...(editableTrip.accessControl || {}),
+                            enabled: e.target.checked
+                          }
+                        })}
+                        style={{ width: '18px', height: '18px', marginTop: '0.2rem', accentColor: 'var(--accent-cyan)' }}
+                      />
+                      <div>
+                        <strong style={{ color: '#fff', fontSize: '0.95rem', display: 'block' }}>
+                          Habilitar fecha programada de apertura / acceso a la página
+                        </strong>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.2rem', display: 'block' }}>
+                          Al marcar esta casilla, los estudiantes verán una cuenta regresiva hasta la fecha y hora seleccionada abajo.
+                        </span>
+                      </div>
+                    </label>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600 }}>
+                        Fecha y Hora Exacta de Apertura (Hora local):
+                      </label>
+                      <input 
+                        type="datetime-local"
+                        className="form-input"
+                        value={editableTrip.accessControl?.openingDate || '2026-10-15T08:00'}
+                        disabled={!editableTrip.accessControl?.enabled}
+                        onChange={(e) => setEditableTrip({
+                          ...editableTrip,
+                          accessControl: {
+                            ...(editableTrip.accessControl || {}),
+                            openingDate: e.target.value
+                          }
+                        })}
+                        style={{ fontSize: '1rem', padding: '0.75rem 1rem' }}
+                      />
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.4rem', display: 'block' }}>
+                        📅 Formato amigable: <strong>{formatDateTimePreview(editableTrip.accessControl?.openingDate)}</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 2. Tipo de Restricción */}
+                  <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                    <h5 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: '1rem' }}>
+                      2. Modo de Restricción
+                    </h5>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                      {/* Modo A: Bloquear toda la página */}
+                      <div 
+                        onClick={() => editableTrip.accessControl?.enabled && setEditableTrip({
+                          ...editableTrip,
+                          accessControl: {
+                            ...(editableTrip.accessControl || {}),
+                            lockMode: 'full_page'
+                          }
+                        })}
+                        style={{ 
+                          padding: '1.25rem', 
+                          borderRadius: 'var(--radius-md)', 
+                          cursor: editableTrip.accessControl?.enabled ? 'pointer' : 'not-allowed',
+                          opacity: editableTrip.accessControl?.enabled ? 1 : 0.6,
+                          background: editableTrip.accessControl?.lockMode === 'full_page' ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255,255,255,0.02)',
+                          border: editableTrip.accessControl?.lockMode === 'full_page' ? '2px solid var(--accent-cyan)' : '1px solid rgba(255,255,255,0.08)',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '1.3rem' }}>🌐</span>
+                          <span className={`badge ${editableTrip.accessControl?.lockMode === 'full_page' ? 'badge-cyan' : 'badge-amber'}`}>
+                            {editableTrip.accessControl?.lockMode === 'full_page' ? 'Seleccionado' : 'Opción 1'}
+                          </span>
+                        </div>
+                        <h6 style={{ fontSize: '0.98rem', fontWeight: 700, color: '#fff', marginBottom: '0.35rem' }}>
+                          Bloquear toda la página (Launch Gate)
+                        </h6>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.45' }}>
+                          Los visitantes solo verán la pantalla de Próxima Apertura con el reloj en cuenta regresiva. Los organizadores acceden con contraseña.
+                        </p>
+                      </div>
+
+                      {/* Modo B: Bloquear solo el registro */}
+                      <div 
+                        onClick={() => editableTrip.accessControl?.enabled && setEditableTrip({
+                          ...editableTrip,
+                          accessControl: {
+                            ...(editableTrip.accessControl || {}),
+                            lockMode: 'registration_only'
+                          }
+                        })}
+                        style={{ 
+                          padding: '1.25rem', 
+                          borderRadius: 'var(--radius-md)', 
+                          cursor: editableTrip.accessControl?.enabled ? 'pointer' : 'not-allowed',
+                          opacity: editableTrip.accessControl?.enabled ? 1 : 0.6,
+                          background: editableTrip.accessControl?.lockMode === 'registration_only' ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255,255,255,0.02)',
+                          border: editableTrip.accessControl?.lockMode === 'registration_only' ? '2px solid var(--accent-cyan)' : '1px solid rgba(255,255,255,0.08)',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '1.3rem' }}>📝</span>
+                          <span className={`badge ${editableTrip.accessControl?.lockMode === 'registration_only' ? 'badge-cyan' : 'badge-amber'}`}>
+                            {editableTrip.accessControl?.lockMode === 'registration_only' ? 'Seleccionado' : 'Opción 2'}
+                          </span>
+                        </div>
+                        <h6 style={{ fontSize: '0.98rem', fontWeight: 700, color: '#fff', marginBottom: '0.35rem' }}>
+                          Bloquear únicamente el registro
+                        </h6>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.45' }}>
+                          Los alumnos pueden navegar la página (itinerario, hotel, autobús), pero el formulario se desbloquea en la fecha programada.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Mensaje y Cierre por Fecha Límite */}
+                  <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                    <h5 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: '1rem' }}>
+                      3. Mensaje a Alumnos y Cierre de Convocatoria
+                    </h5>
+
+                    <div className="form-group">
+                      <label className="form-label">Mensaje personalizado visible antes de la apertura:</label>
+                      <textarea 
+                        rows="3"
+                        className="form-textarea"
+                        placeholder="Ej: La plataforma oficial y el registro abrirán este lunes a las 08:00 AM. ¡Ten listos tus datos!"
+                        value={editableTrip.accessControl?.customMessage || ''}
+                        onChange={(e) => setEditableTrip({
+                          ...editableTrip,
+                          accessControl: {
+                            ...(editableTrip.accessControl || {}),
+                            customMessage: e.target.value
+                          }
+                        })}
+                      />
+                    </div>
+
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', cursor: 'pointer', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.06)', marginTop: '1rem' }}>
+                      <input 
+                        type="checkbox"
+                        checked={Boolean(editableTrip.accessControl?.closeAfterDeadline)}
+                        onChange={(e) => setEditableTrip({
+                          ...editableTrip,
+                          accessControl: {
+                            ...(editableTrip.accessControl || {}),
+                            closeAfterDeadline: e.target.checked
+                          }
+                        })}
+                        style={{ width: '18px', height: '18px', marginTop: '0.2rem', accentColor: 'var(--accent-amber)' }}
+                      />
+                      <div>
+                        <strong style={{ color: '#fff', fontSize: '0.92rem', display: 'block' }}>
+                          Bloquear automáticamente el formulario tras vencer la Fecha Límite de Registro
+                        </strong>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.2rem', display: 'block' }}>
+                          Fecha límite fijada actualmente: <strong>{editableTrip.registrationDeadline || '2026-11-15'}</strong> (puedes ajustarla en la pestaña "Lugar, Hotel y Horarios").
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Botón Guardar */}
+                  <button 
+                    onClick={handleSaveTripGeneral}
+                    disabled={saveStatus === 'guardando'}
+                    className="btn btn-primary"
+                    style={{ padding: '0.95rem', width: '100%', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem' }}
+                  >
+                    {saveStatus === 'guardando' ? (
+                      <>
+                        <RefreshCw size={18} className="spin-animation" />
+                        <span>Guardando cambios en Firestore...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={18} />
+                        <span>Guardar Configuración de Apertura y Acceso</span>
+                      </>
+                    )}
+                  </button>
+
                 </div>
               )}
 
@@ -1267,9 +1740,238 @@ export const AdminModal = ({
                 </div>
               )}
 
+              {/* TAB 6: CONFIGURACIÓN DE CUOTAS, ABONOS Y CLABE */}
+              {activeTab === 'pagos' && (
+                <div style={{ maxWidth: '780px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  
+                  {/* Tarjeta de Resumen Financiero Actual */}
+                  <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div className="icon-bubble icon-bubble-emerald">
+                          <DollarSign size={24} />
+                        </div>
+                        <div>
+                          <h4 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff' }}>
+                            Resumen de Recaudación en Tiempo Real
+                          </h4>
+                          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                            Calculado automáticamente con los registros activos de la base de datos
+                          </span>
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={() => setIsPrintModalOpen(true)}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
+                      >
+                        <Printer size={15} />
+                        <span>Imprimir Lista de Autobús</span>
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.9rem', borderRadius: 'var(--radius-sm)' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Cobrado</div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>
+                          ${totalRevenue.toLocaleString('es-MX')} MXN
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.9rem', borderRadius: 'var(--radius-sm)' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Por Cobrar</div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-amber)' }}>
+                          ${pendingRevenue.toLocaleString('es-MX')} MXN
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.9rem', borderRadius: 'var(--radius-sm)' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Alumnos Liquidados</div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff' }}>
+                          {studentsFullCount} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>de {adminRegistrations.length}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 1. Costos y Anticipo */}
+                  <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                    <h5 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <DollarSign size={18} />
+                      1. Costo Total del Viaje y Anticipo Inicial
+                    </h5>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Costo Total por Alumno ($MXN):</label>
+                        <input 
+                          type="number"
+                          className="form-input"
+                          value={editableTrip.paymentInfo?.totalCost || 3500}
+                          onChange={(e) => setEditableTrip({
+                            ...editableTrip,
+                            paymentInfo: {
+                              ...(editableTrip.paymentInfo || {}),
+                              totalCost: Number(e.target.value) || 0
+                            }
+                          })}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Monto de Anticipo para Apartar ($MXN):</label>
+                        <input 
+                          type="number"
+                          className="form-input"
+                          value={editableTrip.paymentInfo?.depositAmount || 500}
+                          onChange={(e) => setEditableTrip({
+                            ...editableTrip,
+                            paymentInfo: {
+                              ...(editableTrip.paymentInfo || {}),
+                              depositAmount: Number(e.target.value) || 0
+                            }
+                          })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Datos Bancarios Oficiales y Regla del 15 de Noviembre */}
+                  <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                    <h5 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--accent-emerald)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <CreditCard size={18} />
+                      2. Cuenta Bancaria Oficial (SPEI) y Regla del 15 de Noviembre
+                    </h5>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Banco Receptor:</label>
+                        <input 
+                          type="text"
+                          className="form-input"
+                          placeholder="Ej: BBVA México, Banorte, Santander"
+                          value={editableTrip.paymentInfo?.bankName || ''}
+                          onChange={(e) => setEditableTrip({
+                            ...editableTrip,
+                            paymentInfo: {
+                              ...(editableTrip.paymentInfo || {}),
+                              bankName: e.target.value
+                            }
+                          })}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Beneficiario / Titular de la Cuenta:</label>
+                        <input 
+                          type="text"
+                          className="form-input"
+                          placeholder="Ej: Comité Organizador del Viaje de Prácticas"
+                          value={editableTrip.paymentInfo?.accountHolder || ''}
+                          onChange={(e) => setEditableTrip({
+                            ...editableTrip,
+                            paymentInfo: {
+                              ...(editableTrip.paymentInfo || {}),
+                              accountHolder: e.target.value
+                            }
+                          })}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Cuenta CLABE Interbancaria (18 dígitos):</label>
+                        <input 
+                          type="text"
+                          className="form-input"
+                          maxLength={18}
+                          placeholder="012180015623489012"
+                          value={editableTrip.paymentInfo?.clabe || ''}
+                          onChange={(e) => setEditableTrip({
+                            ...editableTrip,
+                            paymentInfo: {
+                              ...(editableTrip.paymentInfo || {}),
+                              clabe: e.target.value
+                            }
+                          })}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Fecha Oficial de Liberación de CLABE:</label>
+                        <input 
+                          type="date"
+                          className="form-input"
+                          value={(editableTrip.paymentInfo?.clabeReleaseDate || '2026-11-15').split('T')[0]}
+                          onChange={(e) => setEditableTrip({
+                            ...editableTrip,
+                            paymentInfo: {
+                              ...(editableTrip.paymentInfo || {}),
+                              clabeReleaseDate: e.target.value + 'T00:00:00'
+                            }
+                          })}
+                        />
+                      </div>
+                    </div>
+
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', cursor: 'pointer', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <input 
+                        type="checkbox"
+                        checked={Boolean(editableTrip.paymentInfo?.forceClabeVisible)}
+                        onChange={(e) => setEditableTrip({
+                          ...editableTrip,
+                          paymentInfo: {
+                            ...(editableTrip.paymentInfo || {}),
+                            forceClabeVisible: e.target.checked
+                          }
+                        })}
+                        style={{ width: '18px', height: '18px', marginTop: '0.2rem', accentColor: 'var(--accent-emerald)' }}
+                      />
+                      <div>
+                        <strong style={{ color: '#fff', fontSize: '0.92rem', display: 'block' }}>
+                          Mostrar y habilitar la Cuenta CLABE de inmediato en la página pública
+                        </strong>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.2rem', display: 'block' }}>
+                          Por defecto, la CLABE está protegida con cuenta regresiva hasta el <strong>15 de noviembre</strong>. Marca esta casilla únicamente si deseas liberarla antes o si ya abrieron recepción de depósitos.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Botón Guardar */}
+                  <button 
+                    onClick={handleSaveTripGeneral}
+                    disabled={saveStatus === 'guardando'}
+                    className="btn btn-primary"
+                    style={{ padding: '0.95rem', width: '100%', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem' }}
+                  >
+                    {saveStatus === 'guardando' ? (
+                      <>
+                        <RefreshCw size={18} className="spin-animation" />
+                        <span>Guardando configuración de pagos en Firestore...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={18} />
+                        <span>Guardar Configuración de Pagos y CLABE</span>
+                      </>
+                    )}
+                  </button>
+
+                </div>
+              )}
+
             </div>
           </>
         )}
+
+        {/* Modal de Impresión Oficial y Gafetes */}
+        <PrintAttendanceModal 
+          isOpen={isPrintModalOpen}
+          onClose={() => setIsPrintModalOpen(false)}
+          students={adminRegistrations}
+          trip={editableTrip}
+        />
 
       </div>
     </div>

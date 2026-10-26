@@ -55,6 +55,9 @@ export const Navbar = ({ onOpenAdmin, tripTitle }) => {
             <a href="#itinerario" className="nav-link">Itinerario y Horarios</a>
           </li>
           <li>
+            <a href="#pagos" className="nav-link">Pagos & Abonos</a>
+          </li>
+          <li>
             <a href="#registro" className="nav-link">Registro de Interés</a>
           </li>
         </ul>

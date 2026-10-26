@@ -16,6 +16,9 @@ export const exportStudentsToCSV = (students, tripTitle = 'Viaje_de_Practicas_20
     'Grupo',
     'Teléfono / WhatsApp',
     'Correo Electrónico',
+    'Estatus de Pago',
+    'Monto Pagado ($MXN)',
+    'Notas de Pago',
     'Observaciones / Requisitos',
     'Fecha de Registro'
   ];
@@ -26,6 +29,12 @@ export const exportStudentsToCSV = (students, tripTitle = 'Viaje_de_Practicas_20
       ? new Date(s.createdAt).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
       : 'N/A';
 
+    const statusLabel = s.paymentStatus === 'full' 
+      ? 'Liquidado (100%)' 
+      : s.paymentStatus === 'deposit' 
+        ? 'Anticipo Pagado' 
+        : 'Pendiente';
+
     return [
       index + 1,
       `"${(s.fullName || '').replace(/"/g, '""')}"`,
@@ -35,6 +44,9 @@ export const exportStudentsToCSV = (students, tripTitle = 'Viaje_de_Practicas_20
       `"${s.group || ''}"`,
       `"${(s.phone || '').replace(/"/g, '""')}"`,
       `"${(s.email || '').replace(/"/g, '""')}"`,
+      `"${statusLabel}"`,
+      s.amountPaid || 0,
+      `"${(s.paymentNotes || '').replace(/"/g, '""')}"`,
       `"${(s.notes || '').replace(/"/g, '""')}"`,
       `"${formattedDate}"`
     ].join(',');
