@@ -23,7 +23,9 @@ import {
   Check,
   Printer,
   DollarSign,
-  CreditCard
+  CreditCard,
+  MessageCircle,
+  Send
 } from 'lucide-react';
 import { exportStudentsToCSV } from '../services/exportService';
 import { 
@@ -68,6 +70,8 @@ export const AdminModal = ({
   const [filterPayment, setFilterPayment] = useState('todos'); // 'todos' | 'pending' | 'deposit' | 'full'
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [paymentUpdateMsg, setPaymentUpdateMsg] = useState('');
+  const [waModalStudent, setWaModalStudent] = useState(null);
+  const [customWaMsg, setCustomWaMsg] = useState('');
 
   // Estado local para editar el viaje
   const [editableTrip, setEditableTrip] = useState(tripData);
@@ -177,6 +181,37 @@ export const AdminModal = ({
         alert('Error al eliminar registro: ' + (err.message || 'Error en Firebase'));
       }
     }
+  };
+
+  // Obtener fecha límite formateada para mensajes de WhatsApp
+  const getDeadlineText = () => {
+    if (editableTrip.registrationDeadline) {
+      try {
+        return new Date(editableTrip.registrationDeadline + 'T00:00:00').toLocaleDateString('es-MX', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+      } catch {
+        return editableTrip.registrationDeadline;
+      }
+    }
+    return '15 de noviembre de 2026';
+  };
+
+  // Abrir modal de WhatsApp con plantillas
+  const openWhatsAppModal = (student, templateType = 'deadline') => {
+    const deadline = getDeadlineText();
+    let text = '';
+    if (templateType === 'deadline') {
+      text = `Hola ${student.fullName}, te recordamos que tu fecha límite para liquidar tu lugar del viaje es el ${deadline}. Si tienes alguna duda sobre tus abonos o métodos de pago, con gusto te apoyamos.`;
+    } else if (templateType === 'deposit') {
+      text = `Hola ${student.fullName}, te recordamos que para asegurar tu lugar en el autobús del Viaje de Prácticas 2026 es necesario apartar con tu anticipo de $${editableTrip.paymentInfo?.depositAmount || 500} antes del ${deadline}.`;
+    } else if (templateType === 'clabe') {
+      text = `Hola ${student.fullName}, te compartimos la cuenta oficial para transferencias del Viaje de Prácticas 2026: Banco: ${editableTrip.paymentInfo?.bankName || 'BBVA México'}, CLABE: ${editableTrip.paymentInfo?.clabe || '012180015623489012'}. Por favor incluye tu matrícula (${student.controlNumber}) en el concepto y envíanos tu comprobante.`;
+    }
+    setCustomWaMsg(text);
+    setWaModalStudent(student);
   };
 
   // Actualizar estado de pago de un alumno
@@ -750,15 +785,53 @@ export const AdminModal = ({
                                 <td><span className="badge badge-purple">{st.semester}° Sem</span></td>
                                 <td><strong>{st.group}</strong></td>
                                 <td>
-                                  <a 
-                                    href={`https://wa.me/52${st.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${st.fullName}, te contactamos del Comité Organizador del Viaje de Prácticas 2026 respecto a tu registro.`)}`} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    style={{ color: 'var(--accent-emerald)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                                    title="Contactar al alumno por WhatsApp"
-                                  >
-                                    {st.phone}
-                                  </a>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'nowrap' }}>
+                                    <a 
+                                      href={`https://wa.me/${(st.phone || '').replace(/[^0-9]/g, '').startsWith('52') ? (st.phone || '').replace(/[^0-9]/g, '') : '52' + (st.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${st.fullName}, te recordamos que tu fecha límite para liquidar tu lugar del viaje es el ${getDeadlineText()}.`)}`} 
+                                      target="_blank" 
+                                      rel="noreferrer"
+                                      style={{ color: '#6ee7b7', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600, fontSize: '0.84rem' }}
+                                      title="Abrir chat en WhatsApp"
+                                    >
+                                      <MessageCircle size={15} style={{ color: 'var(--accent-emerald)', flexShrink: 0 }} />
+                                      <span>{st.phone}</span>
+                                    </a>
+
+                                    {/* Botón directo de Recordatorio de Fecha Límite */}
+                                    <a 
+                                      href={`https://wa.me/${(st.phone || '').replace(/[^0-9]/g, '').startsWith('52') ? (st.phone || '').replace(/[^0-9]/g, '') : '52' + (st.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${st.fullName}, te recordamos que tu fecha límite para liquidar tu lugar del viaje es el ${getDeadlineText()}.`)}`} 
+                                      target="_blank" 
+                                      rel="noreferrer"
+                                      className="btn"
+                                      style={{
+                                        padding: '0.22rem 0.55rem',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 600,
+                                        background: 'rgba(16, 185, 129, 0.16)',
+                                        border: '1px solid rgba(16, 185, 129, 0.45)',
+                                        color: '#6ee7b7',
+                                        borderRadius: 'var(--radius-sm)',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem',
+                                        textDecoration: 'none',
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                      title={`Enviar recordatorio directo: "Hola ${st.fullName}, te recordamos que tu fecha límite para liquidar tu lugar del viaje es el ${getDeadlineText()}."`}
+                                    >
+                                      <span>Recordar</span>
+                                    </a>
+
+                                    {/* Botón para elegir otras plantillas o editar mensaje */}
+                                    <button 
+                                      onClick={() => openWhatsAppModal(st, 'deadline')}
+                                      className="btn btn-secondary"
+                                      style={{ padding: '0.2rem 0.45rem', fontSize: '0.72rem' }}
+                                      title="Elegir o editar mensaje personalizado de WhatsApp"
+                                    >
+                                      ✏️
+                                    </button>
+                                  </div>
                                 </td>
                                 <td>
                                   {/* Control Interactivo de Pago por Alumno */}
@@ -1972,6 +2045,99 @@ export const AdminModal = ({
           students={adminRegistrations}
           trip={editableTrip}
         />
+
+        {/* Modal de Mensajería Rápida de WhatsApp */}
+        {waModalStudent && (
+          <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={() => setWaModalStudent(null)}>
+            <div className="modal-content" style={{ maxWidth: '520px', width: '92vw' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div className="icon-bubble icon-bubble-emerald" style={{ width: '38px', height: '38px' }}>
+                    <MessageCircle size={20} />
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fff' }}>
+                      Mensaje Rápido de WhatsApp
+                    </h4>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      Para: <strong style={{ color: '#fff' }}>{waModalStudent.fullName}</strong> ({waModalStudent.phone})
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setWaModalStudent(null)}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.4rem', borderRadius: '50%' }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="modal-body" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.4rem', color: 'var(--text-muted)' }}>
+                    Plantillas rápidas con datos automáticos:
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.45rem' }}>
+                    <button 
+                      onClick={() => openWhatsAppModal(waModalStudent, 'deadline')}
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.74rem', padding: '0.5rem 0.3rem', textAlign: 'center' }}
+                    >
+                      📅 Fecha Límite
+                    </button>
+                    <button 
+                      onClick={() => openWhatsAppModal(waModalStudent, 'deposit')}
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.74rem', padding: '0.5rem 0.3rem', textAlign: 'center' }}
+                    >
+                      💰 Anticipo ($500)
+                    </button>
+                    <button 
+                      onClick={() => openWhatsAppModal(waModalStudent, 'clabe')}
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.74rem', padding: '0.5rem 0.3rem', textAlign: 'center' }}
+                    >
+                      🏦 Cuenta CLABE
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Texto del mensaje a enviar:</label>
+                  <textarea 
+                    rows="4"
+                    className="form-textarea"
+                    value={customWaMsg}
+                    onChange={(e) => setCustomWaMsg(e.target.value)}
+                    style={{ fontSize: '0.86rem', lineHeight: '1.5' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  <button 
+                    onClick={() => setWaModalStudent(null)}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.55rem 1rem', fontSize: '0.85rem' }}
+                  >
+                    Cancelar
+                  </button>
+                  <a 
+                    href={`https://wa.me/${(waModalStudent.phone || '').replace(/[^0-9]/g, '').startsWith('52') ? (waModalStudent.phone || '').replace(/[^0-9]/g, '') : '52' + (waModalStudent.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(customWaMsg)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => setWaModalStudent(null)}
+                    className="btn btn-primary"
+                    style={{ padding: '0.55rem 1.25rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.45rem', background: '#10b981', borderColor: '#10b981', color: '#fff', textDecoration: 'none' }}
+                  >
+                    <Send size={15} />
+                    <span>Abrir en WhatsApp</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
